@@ -284,3 +284,32 @@ internal static class ShotgunItemStatePatch
         __instance.GetComponent<ShotgunPhysics>()?.Apply();
     }
 }
+
+/// <summary>
+/// While equipping, <c>CharacterItems.Equip</c> places the item at <c>GetItemHoldPos(item, pushOffTerrain: true)</c>
+/// and then joins both hands to it where it sits. The push casts a ray from the hip toward the hold point, and on
+/// any Terrain/Map hit it shortens the offset to <c>max(hit, 0.2) - 0.4</c>. For a close hit that is zero or
+/// negative, so the gun is attached inside or behind the scout's body. Our hold point is far out and low, so the ray
+/// often hits a wall or the floor, which is why some draws came out wrong. Held colliders are triggers
+/// (<see cref="ShotgunPhysics.Apply"/>), so there is nothing to push off: always use the unpushed hold point.
+/// </summary>
+[HarmonyPatch(typeof(CharacterItems), nameof(CharacterItems.GetItemHoldPos))]
+internal static class ShotgunHoldPosPatch
+{
+    [HarmonyPostfix]
+    private static void KeepHoldPointOutOfTheBody(CharacterItems __instance, Item item, bool pushOffTerrain, ref Vector3 __result)
+    {
+        if (!pushOffTerrain || item == null || item.GetComponent<ShotgunInstanceSetup>() == null)
+        {
+            return;
+        }
+
+        Vector3 unpushed = __instance.GetItemHoldPos(item, pushOffTerrain: false);
+        float pulledIn = Vector3.Distance(unpushed, __result);
+        if (pulledIn > 0.01f)
+        {
+            Plugin.Log.LogInfo($"Equip: ignored pushOffTerrain, which would have pulled the shotgun {pulledIn:0.00} m toward the hip.");
+            __result = unpushed;
+        }
+    }
+}

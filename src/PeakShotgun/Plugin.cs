@@ -257,11 +257,9 @@ public partial class Plugin : BaseUnityPlugin
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
         // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.
         // These are live: edit and save the .cfg while the game runs and the pose updates within a second.
-        // Keep the target inside arm's reach. The hands are jointed to the gun, so a target the arms cannot
-        // reach makes HoldItem's pull fight the arms, and where the gun settles changes from draw to draw.
         poseRight = Config.Bind("HoldPose", "Right", 0.5f, "Item.defaultPos.x: how far right of the head the gun and both hands are held. 0 = centred.");
         poseUp = Config.Bind("HoldPose", "Up", -0.4f, "Item.defaultPos.y: height relative to the head bone. The blowgun uses 0.33 (mouth). Bigger = higher on screen.");
-        poseForward = Config.Bind("HoldPose", "Forward", 1.15f, "Item.defaultPos.z: how far in front of the head the gun is held (vanilla items use 1). Past arm's reach (about 1.2 here) the gun no longer moves out; it lands in a different spot on each draw.");
+        poseForward = Config.Bind("HoldPose", "Forward", 1.15f, "Item.defaultPos.z: metres in front of the head the gun is pulled toward (vanilla items use 1). The arms stop it at their reach, so past that it mostly changes how hard it is pulled.");
         poseLeftHandLeft = Config.Bind("HoldPose", "LeftHandLeft", 0.09f, "Metres the left hand sits left of the pump centre. Negative = right.");
         poseRightWristTilt = Config.Bind("HoldPose", "RightWristTiltDegrees", 30f, "Degrees the right hand's fingers tip up on the grip. Bigger = right elbow lower. 0 = the vanilla RopeShooter grip.");
         poseToeIn = Config.Bind("HoldPose", "ToeInDegrees", -6f, "Degrees the barrel turns left toward the crosshair. Negative = barrel turns right. 0 = parallel to the aim.");
