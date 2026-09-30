@@ -1,10 +1,10 @@
 # peak-shotgun
 
-![Shotgun preview](media/gun-1.jpg)
+![Shotgun preview](media/1.jpg)
 
-![Shotgun preview](media/gun-2.jpg)
+![Shotgun preview](media/2.jpg)
 
-![Shotgun preview](media/gun-3.jpg)
+![Shotgun preview](media/3.jpg)
 
 Turns PEAK's leftover blowgun into a shotgun.
 
