@@ -29,24 +29,34 @@ public partial class Plugin : BaseUnityPlugin
     internal static int ShotCount { get; private set; } = 5;
 
     internal static float ModelScale { get; private set; } = 0.015f;
-    internal static float ModelPosX { get; private set; }
 
     // Held pose. These read the config entries live (not cached at startup), and Update() re-reads the
     // .cfg file when it changes, so the pose can be tuned while the game is running.
-    private static ConfigEntry<float>? poseScreenRight;
-    private static ConfigEntry<float>? poseDown;
+    private static ConfigEntry<float>? poseRight;
+    private static ConfigEntry<float>? poseUp;
     private static ConfigEntry<float>? poseForward;
+    private static ConfigEntry<float>? poseLeftHandLeft;
+
+    /// <summary>Metres the left hand sits left of the pump centre (item -X, turned with the aim).</summary>
+    internal static float LeftHandLeft => poseLeftHandLeft?.Value ?? 0.09f;
+
+    private static ConfigEntry<float>? poseRightWristTilt;
+
+    /// <summary>Degrees the right hand's fingers tip up (about item +X) so the forearm comes from below and the elbow drops.</summary>
+    internal static float RightWristTilt => poseRightWristTilt?.Value ?? 30f;
+
     private static ConfigEntry<float>? poseToeIn;
     private static ConfigEntry<float>? poseMuzzleUp;
 
-    /// <summary>Moves the held gun and both hand anchors toward the scout's right (item +X).</summary>
-    internal static float HeldOffsetRight => poseScreenRight?.Value ?? 0.79f;
-
-    /// <summary>Moves the held gun AND both hand anchors down (item -Y). Negative = up.</summary>
-    internal static float HeldOffsetDown => poseDown?.Value ?? 0.36f;
-
-    /// <summary>Extra push forward (item +Z) on top of Model.PosZ. Negative = toward the body.</summary>
-    internal static float HeldOffsetForward => poseForward?.Value ?? 0f;
+    /// <summary>
+    /// PEAK's <c>Item.defaultPos</c>: where the item root (and so the grip and both hands) is held, in the
+    /// scout's look space (+X right, +Y up, +Z forward) from the head bone. The camera sits about 1 up from
+    /// that bone (<c>Character.GetCameraPos</c>). The blowgun we clone uses (0, 0.33, 1): centred at the mouth.
+    /// </summary>
+    internal static Vector3 HeldDefaultPos => new(
+        poseRight?.Value ?? 0.65f,
+        poseUp?.Value ?? 0.2f,
+        poseForward?.Value ?? 1.15f);
 
     /// <summary>Degrees the barrel turns toward the crosshair (left, since the gun sits on the right).</summary>
     internal static float HeldToeIn => poseToeIn?.Value ?? 5f;
@@ -60,8 +70,6 @@ public partial class Plugin : BaseUnityPlugin
     private DateTime lastConfigWriteUtc;
     private float nextConfigCheck;
 
-    internal static float ModelPosY { get; private set; }
-    internal static float ModelPosZ { get; private set; }
     internal static float ModelRotX { get; private set; }
     internal static float ModelRotY { get; private set; }
     internal static float ModelRotZ { get; private set; }
@@ -91,15 +99,17 @@ public partial class Plugin : BaseUnityPlugin
     internal static readonly Quaternion HeldBaseRotation =
         Quaternion.Inverse(Quaternion.LookRotation(Vector3.left, Vector3.forward));
 
-    internal static Quaternion HeldLocalRotation =>
-        Quaternion.Euler(ModelRotX - HeldMuzzleUp, ModelRotY - HeldToeIn, ModelRotZ) * HeldBaseRotation;
+    /// <summary>Toe-in / muzzle-up (plus Model.Rot*) in item space. The gun and both hand anchors turn by this.</summary>
+    internal static Quaternion HeldAim =>
+        Quaternion.Euler(ModelRotX - HeldMuzzleUp, ModelRotY - HeldToeIn, ModelRotZ);
+
+    internal static Quaternion HeldLocalRotation => HeldAim * HeldBaseRotation;
 
     /// <summary>
-    /// Grip at the item origin (where PEAK puts the hands), plus a small Pos* fine-tune.
-    /// Without the grip pivot, the centered mesh puts the camera inside the receiver in FP.
+    /// Grip at the item origin. PEAK holds the item origin at <see cref="HeldDefaultPos"/>, so the
+    /// right hand (Hand_R at the origin) stays within arm's reach wherever the gun is placed on screen.
     /// </summary>
-    internal static Vector3 HeldLocalPosition =>
-        new Vector3(ModelPosX + HeldOffsetRight, ModelPosY - HeldOffsetDown, ModelPosZ + HeldOffsetForward) - HeldLocalRotation * (GripMeshPoint * ModelScale);
+    internal static Vector3 HeldLocalPosition => -(HeldLocalRotation * (GripMeshPoint * ModelScale));
 
     internal static Vector3 RestLocalPosition => new(RestPosX, RestPosY + RestMeshLift, RestPosZ);
 
@@ -113,21 +123,46 @@ public partial class Plugin : BaseUnityPlugin
     {
         Bounds b = mesh.bounds;
         // OBJ loader flips X: source stock (was -X) lands on max.x, muzzle on min.x.
-        // Gripping min.x put the pivot on the muzzle so the barrel ran back through the scout
-        // (looked like "points at my head" / turn left → gun swings right).
-        GripMeshPoint = new Vector3(
-            Mathf.Lerp(b.min.x, b.max.x, 0.82f),
-            b.center.y,
-            Mathf.Lerp(b.min.z, b.max.z, 0.35f));
-        ForendMeshPoint = new Vector3(
-            Mathf.Lerp(b.min.x, b.max.x, 0.38f),
-            b.center.y - b.extents.y * 0.15f,
-            Mathf.Lerp(b.min.z, b.max.z, 0.35f));
+        // The mesh is not axis-aligned (the stock drops and drifts sideways), so whole-mesh bounds put the
+        // hands beside and below the gun. Centre each hand on the cross-section of the part it holds instead.
+        // Slices are fractions from muzzle (0) to butt (1): the stock wrist sits just behind the trigger guard,
+        // the pump is the ribbed block under the barrel ahead of the receiver.
+        Vector3[] vertices = mesh.vertices;
+        Bounds wrist = SliceBounds(vertices, b, 0.64f, 0.72f);
+        Bounds pump = SliceBounds(vertices, b, 0.18f, 0.30f);
+        GripMeshPoint = wrist.center;
+        // Palm under the pump: hand bone at the pump's underside.
+        ForendMeshPoint = new Vector3(pump.center.x, pump.center.y, pump.min.z);
         MuzzleMeshPoint = new Vector3(b.min.x, b.center.y, b.center.z);
 
         RestMeshLift = -MinRestYInItemSpace(mesh.vertices, new Vector3(RestPosX, RestPosY, RestPosZ));
         Log?.LogInfo(
             $"Mesh anchors: grip={GripMeshPoint}, forend={ForendMeshPoint}, muzzle={MuzzleMeshPoint}, restLift={RestMeshLift:0.###}.");
+    }
+
+    private static Bounds SliceBounds(Vector3[] vertices, Bounds whole, float t0, float t1)
+    {
+        float x0 = Mathf.Lerp(whole.min.x, whole.max.x, t0);
+        float x1 = Mathf.Lerp(whole.min.x, whole.max.x, t1);
+        Vector3 min = Vector3.positiveInfinity;
+        Vector3 max = Vector3.negativeInfinity;
+        foreach (Vector3 v in vertices)
+        {
+            if (v.x >= x0 && v.x <= x1)
+            {
+                min = Vector3.Min(min, v);
+                max = Vector3.Max(max, v);
+            }
+        }
+
+        if (min.x > max.x)
+        {
+            return new Bounds(new Vector3((x0 + x1) * 0.5f, whole.center.y, whole.center.z), Vector3.zero);
+        }
+
+        var slice = new Bounds();
+        slice.SetMinMax(min, max);
+        return slice;
     }
 
     /// <summary>
@@ -219,18 +254,16 @@ public partial class Plugin : BaseUnityPlugin
         Log = Logger;
         ShotCount = Mathf.Max(1, Config.Bind("Shotgun", "Shots", 5, "Shots in each shotgun.").Value);
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
-        ModelPosX = Config.Bind("Model", "PosX", 0f, "Extra held X offset after grip-pivot (usually 0).").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
-        // would ignore a changed default. Older [Model] HeldSideOffset / HeldOffsetRight / HeldOffsetDown
-        // and [HeldPose] entries in the .cfg are simply unused now.
+        // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.
         // These are live: edit and save the .cfg while the game runs and the pose updates within a second.
-        poseScreenRight = Config.Bind("Pose", "ScreenRight", 0.79f, "Metres to move the held shotgun and both hands to the scout's right.");
-        poseDown = Config.Bind("Pose", "Down", 0.36f, "Metres to move the gun AND both hands down. Bigger = lower. Negative = higher.");
-        poseForward = Config.Bind("Pose", "Forward", 0f, "Metres to push the gun AND both hands forward (on top of Model.PosZ). Negative = closer to the body.");
-        poseToeIn = Config.Bind("Pose", "ToeInDegrees", 5f, "Degrees the barrel turns left toward the crosshair. Makes the gun show its side in first person instead of pointing straight away. 0 = parallel to the aim.");
-        poseMuzzleUp = Config.Bind("Pose", "MuzzleUpDegrees", 2f, "Degrees the muzzle tips up toward the crosshair. Negative = muzzle down.");
-        ModelPosY = Config.Bind("Model", "PosY", -0.04f, "Extra held Y offset after grip-pivot (negative lowers the gun in FP).").Value;
-        ModelPosZ = Config.Bind("Model", "PosZ", 0.18f, "Extra held Z offset after grip-pivot (push forward away from camera).").Value;
+        poseRight = Config.Bind("HoldPose", "Right", 0.65f, "Item.defaultPos.x: how far right of the head the gun and both hands are held. 0 = centred.");
+        poseUp = Config.Bind("HoldPose", "Up", 0.2f, "Item.defaultPos.y: height above the head bone. The blowgun uses 0.33 (mouth). Bigger = higher on screen.");
+        poseForward = Config.Bind("HoldPose", "Forward", 1.15f, "Item.defaultPos.z: how far in front of the head the gun is held (vanilla items use 1). Smaller = closer to the camera.");
+        poseLeftHandLeft = Config.Bind("HoldPose", "LeftHandLeft", 0.09f, "Metres the left hand sits left of the pump centre. Negative = right.");
+        poseRightWristTilt = Config.Bind("HoldPose", "RightWristTiltDegrees", 30f, "Degrees the right hand's fingers tip up on the grip. Bigger = right elbow lower. 0 = the vanilla RopeShooter grip.");
+        poseToeIn = Config.Bind("HoldPose", "ToeInDegrees", 5f, "Degrees the barrel turns left toward the crosshair. Makes the gun show its side in first person instead of pointing straight away. 0 = parallel to the aim.");
+        poseMuzzleUp = Config.Bind("HoldPose", "MuzzleUpDegrees", 2f, "Degrees the muzzle tips up toward the crosshair. Negative = muzzle down.");
         // Extra euler applied on top of the barrel→forward / top→up base alignment. Leave at 0 unless tuning.
         ModelRotX = Config.Bind("Model", "RotX", 0f, "Extra held local X euler on top of barrel-forward alignment.").Value;
         ModelRotY = Config.Bind("Model", "RotY", 0f, "Extra held local Y euler on top of barrel-forward alignment.").Value;
@@ -269,10 +302,7 @@ public partial class Plugin : BaseUnityPlugin
     }
 
     private static void LogPose(string prefix) =>
-        Log.LogInfo(
-            $"{prefix}: screenRight={HeldOffsetRight:0.###}, down={HeldOffsetDown:0.###}, forward={HeldOffsetForward:0.###}, "
-            + $"toeIn={HeldToeIn:0.#}°, muzzleUp={HeldMuzzleUp:0.#}° "
-            + $"(Model.PosY={ModelPosY:0.###}, PosZ={ModelPosZ:0.###}).");
+        Log.LogInfo($"{prefix}: defaultPos={HeldDefaultPos}, toeIn={HeldToeIn:0.#}°, muzzleUp={HeldMuzzleUp:0.#}°.");
 
     /// <summary>
     /// Live tuning: when the .cfg file changes on disk, reload it and tell held guns to re-place their
@@ -412,7 +442,7 @@ public partial class Plugin : BaseUnityPlugin
             DestroyImmediate(particles);
         }
 
-        Transform? customMuzzle = ShotgunModelSwap.Apply(gunObject, database, blowgun);
+        Transform? customMuzzle = ShotgunModelSwap.Apply(gunObject, database);
         if (customMuzzle != null)
         {
             spawn = customMuzzle;

@@ -11,7 +11,7 @@ internal static class ShotgunModelSwap
     private const string ObjResource = "PeakShotgun.models.shotgun.obj";
     private const string AlbedoResource = "PeakShotgun.models.shotgun_albedo.png";
 
-    internal static Transform? Apply(GameObject gunObject, ItemDatabase database, Item sourceItem)
+    internal static Transform? Apply(GameObject gunObject, ItemDatabase database)
     {
         Mesh? mesh = LoadEmbeddedMesh();
         if (mesh == null)
@@ -21,10 +21,10 @@ internal static class ShotgunModelSwap
         }
 
         Texture2D? albedo = LoadEmbeddedTexture(AlbedoResource, "ShotgunAlbedo");
-        Material? peakMaterial = FindNonCharacterItemMaterial(database, sourceItem);
+        Material? peakMaterial = FindItemMaterial(database);
         if (peakMaterial == null)
         {
-            Plugin.Log.LogWarning("No non-Character item material was found; falling back to the blowgun shader.");
+            Plugin.Log.LogWarning($"No {ItemShader} material was found; falling back to the blowgun shader.");
             peakMaterial = FindPeakMaterial(gunObject);
         }
 
@@ -74,8 +74,9 @@ internal static class ShotgunModelSwap
     }
 
     /// <summary>
-    /// PEAK attaches each hand to direct children named Hand_R / Hand_L.
-    /// Put the original hand anchors directly on the shotgun grip and forend; keep their original rotations.
+    /// PEAK attaches each hand to direct children named Hand_R / Hand_L (position AND rotation), and holds
+    /// the item root at <c>Item.defaultPos</c>. Put the grip at the root, the pump ahead of it, and turn
+    /// each hand to wrap its part. The blowgun rotations we clone are for a tube held at the mouth.
     /// </summary>
     internal static void PlaceHandAnchors(GameObject gunObject, Mesh mesh, bool log = true)
     {
@@ -107,20 +108,42 @@ internal static class ShotgunModelSwap
         // The right hand holds the grip / trigger, the left hand reaches forward to the pump.
         if (handR != null)
         {
-            handR.localPosition = ToItem(gripMesh);
+            Quaternion rightRot = Plugin.HeldAim * Quaternion.Euler(-Plugin.RightWristTilt, 0f, 0f) * RightGripRotation;
+            handR.localRotation = rightRot;
+            // The anchor is the hand BONE (wrist end), not the palm: the fist closes GripReach along the fingers.
+            handR.localPosition = ToItem(gripMesh) - rightRot * (Vector3.up * GripReach);
         }
 
         if (handL != null)
         {
-            handL.localPosition = ToItem(forendMesh);
+            handL.localPosition = ToItem(forendMesh) + Plugin.HeldAim * (Vector3.left * Plugin.LeftHandLeft);
+            handL.localRotation = Plugin.HeldAim * LeftPumpRotation;
+        }
+
+        if (gunObject.TryGetComponent(out Item item))
+        {
+            item.defaultPos = Plugin.HeldDefaultPos;
         }
 
         if (log)
         {
             Plugin.Log.LogInfo(
-                $"Shotgun hand anchors: grip(Hand_R)={handR?.localPosition}, forend(Hand_L)={handL?.localPosition} (original rotations).");
+                $"Shotgun hand anchors: grip(Hand_R)={handR?.localPosition}, forend(Hand_L)={handL?.localPosition}, defaultPos={Plugin.HeldDefaultPos}.");
         }
     }
+
+    // Scout hand bones: forward = thumb side of the fist (the gripped axis), up = the fingers,
+    // right = palm normal on the right hand (checked against vanilla Torch / Honeycomb / RopeShooter anchors).
+    // Right: the vanilla RopeShooter's Hand_R (upright pistol grip), then tipped by RightWristTiltDegrees.
+    // A thumb-forward rifle-wrist fist points the fingers down, which brings the forearm in from above.
+    private static readonly Quaternion RightGripRotation = new(-0.108f, 0.658f, 0.677f, 0.311f);
+
+    // Metres from the hand bone to the centre of the bar it grips, along the fingers axis. Vanilla anchors
+    // around a centred shaft: Torch R 0.134, Torch L 0.160, RopeShooter R 0.141; ~0 along the palm normal.
+    private const float GripReach = 0.14f;
+
+    // Left: thumb along the barrel toward the muzzle, palm up under the pump, fingers wrapping up its right side.
+    private static readonly Quaternion LeftPumpRotation = Quaternion.LookRotation(Vector3.forward, new Vector3(1f, 0.4f, 0f));
 
     private static Material? FindPeakMaterial(GameObject gunObject)
     {
@@ -154,30 +177,33 @@ internal static class ShotgunModelSwap
         return null;
     }
 
-    private static Material? FindNonCharacterItemMaterial(ItemDatabase database, Item sourceItem)
+    /// <summary>
+    /// Ordinary PEAK items (flare, dynamite, guidebook…) render with W/Peak_Standard. Other catalog shaders
+    /// such as W/Character, W/Peak_Dither and W/Peak_Glass read the screen position and dither the mesh away
+    /// when the camera gets close, so do not take whatever non-Character material comes first.
+    /// </summary>
+    private const string ItemShader = "W/Peak_Standard";
+
+    private static Material? FindItemMaterial(ItemDatabase database)
     {
+        // Catalog prefabs never ran Item.Awake, so Item.mainRenderer is usually unset: scan their renderers.
         foreach (Item candidate in database.Objects)
         {
-            if (candidate == null || candidate == sourceItem || candidate.mainRenderer == null)
+            if (candidate == null)
             {
                 continue;
             }
 
-            foreach (Material material in candidate.mainRenderer.sharedMaterials)
+            foreach (Renderer renderer in candidate.GetComponentsInChildren<Renderer>(true))
             {
-                Shader? shader = material != null ? material.shader : null;
-                if (shader == null
-                    || shader.name.IndexOf("Character", StringComparison.OrdinalIgnoreCase) >= 0
-                    || shader.name.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0
-                    || shader.name.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0
-                    || shader.name == "Standard"
-                    || shader.name == "Diffuse")
+                foreach (Material material in renderer.sharedMaterials)
                 {
-                    continue;
+                    if (material != null && material.shader != null && material.shader.name == ItemShader)
+                    {
+                        Plugin.Log.LogInfo($"Using world-item material {material.name} from {candidate.name} (shader={ItemShader}).");
+                        return material;
+                    }
                 }
-
-                Plugin.Log.LogInfo($"Using world-item material from {candidate.name} (shader={shader.name}).");
-                return material;
             }
         }
 
@@ -203,59 +229,7 @@ internal static class ShotgunModelSwap
         material.name = "ShotgunCustom";
         ApplyAlbedoToMaterial(material, albedo);
         ForceOpaqueDoubleSided(material);
-        // Do not zero "Close*" / "Dither*" floats — on W/Character many of those are
-        // distance thresholds where 0 means "always faded", which makes the gun vanish.
-        // Instead, take the gun out of the proximity fade by pinning PlayerPos (see below).
-        ApplyProximityFadeOverride(material);
         return material;
-    }
-
-    /// <summary>
-    /// PEAK's PlayerShaderParams.Update sets the global shader vector "PlayerPos" to the local scout's
-    /// centre every frame, and the Character shader dithers fragments near it. A value set on the material
-    /// itself takes precedence over a global, so pinning it far away means nothing on this gun counts as
-    /// "near the player". We can't read the shader source, so this also logs what the shader exposes:
-    /// if the gun still fades after this, that log tells us the property that actually drives it.
-    /// </summary>
-    private static void ApplyProximityFadeOverride(Material material)
-    {
-        LogFadeRelatedProperties(material);
-        material.SetVector("PlayerPos", new Vector4(10000f, 10000f, 10000f, 0f));
-        Plugin.Log.LogInfo(
-            $"Proximity fade override applied (shader declares PlayerPos: {material.HasProperty("PlayerPos")}).");
-    }
-
-    private static void LogFadeRelatedProperties(Material material)
-    {
-        Shader shader = material.shader;
-        int count = shader.GetPropertyCount();
-        var fadeRelated = new List<string>();
-        var all = new List<string>();
-        for (int i = 0; i < count; i++)
-        {
-            string name = shader.GetPropertyName(i);
-            all.Add(name);
-            if (name.IndexOf("fade", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("dither", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("close", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("near", System.StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("player", System.StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                string value = shader.GetPropertyType(i) switch
-                {
-                    UnityEngine.Rendering.ShaderPropertyType.Float
-                        or UnityEngine.Rendering.ShaderPropertyType.Range => material.GetFloat(name).ToString("0.###"),
-                    UnityEngine.Rendering.ShaderPropertyType.Vector => material.GetVector(name).ToString(),
-                    UnityEngine.Rendering.ShaderPropertyType.Color => material.GetColor(name).ToString(),
-                    _ => shader.GetPropertyType(i).ToString(),
-                };
-                fadeRelated.Add($"{name}={value}");
-            }
-        }
-
-        Plugin.Log.LogInfo(
-            $"Shader '{shader.name}' fade-related properties: {(fadeRelated.Count > 0 ? string.Join(", ", fadeRelated) : "(none)")}.");
-        Plugin.Log.LogInfo($"Shader '{shader.name}' all properties ({count}): {string.Join(", ", all)}.");
     }
 
     private static void ClearTextures(Material material)
@@ -322,6 +296,7 @@ internal static class ShotgunModelSwap
             "_Texture",
             "_MainTexture",
             "_BaseColorTexture",
+            "_BaseTexture",
         ];
 
         foreach (string prop in textureProps)
@@ -343,6 +318,12 @@ internal static class ShotgunModelSwap
         catch
         {
             // ignored
+        }
+
+        // W/Peak_Standard blends _BaseTexture over _BaseColor by this amount.
+        if (material.HasProperty("_BaseTexAmount"))
+        {
+            material.SetFloat("_BaseTexAmount", 1f);
         }
 
         string[] colorProps = ["_Color", "_BaseColor", "_UnlitColor"];

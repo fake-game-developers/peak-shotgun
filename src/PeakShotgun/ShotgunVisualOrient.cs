@@ -8,14 +8,10 @@ namespace PeakShotgun;
 /// </summary>
 internal sealed class ShotgunVisualOrient : MonoBehaviour
 {
-    private static readonly int PlayerPosId = Shader.PropertyToID("PlayerPos");
-
     private Item? item;
     private Mesh? mesh;
     private bool? lastHeld;
     private ShotgunLuggageRest? luggageRest;
-    private MeshRenderer? meshRenderer;
-    private MaterialPropertyBlock? propertyBlock;
     private int appliedPoseVersion = -1;
 
     private void Awake()
@@ -23,13 +19,10 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
         item = GetComponentInParent<Item>();
         mesh = GetComponent<MeshFilter>()?.sharedMesh;
         luggageRest = GetComponent<ShotgunLuggageRest>();
-        meshRenderer = GetComponent<MeshRenderer>();
-        propertyBlock = new MaterialPropertyBlock();
     }
 
     private void LateUpdate()
     {
-        KeepPlayerFadeAway();
         item ??= GetComponentInParent<Item>();
         luggageRest ??= GetComponent<ShotgunLuggageRest>();
 
@@ -68,11 +61,16 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
             }
         }
 
+        bool justHeld = held && lastHeld != true;
         lastHeld = held;
         if (held)
         {
             transform.localPosition = Plugin.HeldLocalPosition;
             transform.localRotation = Plugin.HeldLocalRotation;
+            if (justHeld)
+            {
+                LogHeldGeometry();
+            }
         }
         else if (luggageRest != null && luggageRest.Armed)
         {
@@ -86,17 +84,36 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
         }
     }
 
-    private void OnWillRenderObject() => KeepPlayerFadeAway();
-
-    private void KeepPlayerFadeAway()
+    /// <summary>
+    /// One line per equip, in camera space (+X right, +Y up, +Z forward), so the [HoldPose] values can be
+    /// judged against where the camera and the scout's real hands are. Runs a second later so the hold settles.
+    /// </summary>
+    private void LogHeldGeometry()
     {
-        if (meshRenderer == null || propertyBlock == null)
+        if (item?.holderCharacter == null || !item.holderCharacter.IsLocal)
         {
             return;
         }
 
-        meshRenderer.GetPropertyBlock(propertyBlock);
-        propertyBlock.SetVector(PlayerPosId, new Vector4(10000f, 10000f, 10000f, 0f));
-        meshRenderer.SetPropertyBlock(propertyBlock);
+        Invoke(nameof(WriteHeldGeometry), 1f);
+    }
+
+    private void WriteHeldGeometry()
+    {
+        Character? holder = item?.holderCharacter;
+        Camera? cam = MainCamera.instance != null ? MainCamera.instance.cam : Camera.main;
+        if (item == null || holder == null || cam == null)
+        {
+            return;
+        }
+
+        Transform c = cam.transform;
+        Vector3 Cam(Vector3 world) => c.InverseTransformPoint(world);
+        Transform head = holder.GetBodypart(BodypartType.Head).transform;
+        Plugin.Log.LogInfo(
+            $"Held shotgun (camera space): item={Cam(item.transform.position)}, anchorR={Cam(item.transform.Find("Hand_R").position)}, "
+            + $"anchorL={Cam(item.transform.Find("Hand_L").position)}, handR={Cam(holder.GetBodypart(BodypartType.Hand_R).transform.position)}, "
+            + $"handL={Cam(holder.GetBodypart(BodypartType.Hand_L).transform.position)}, headBone={Cam(head.position)}, "
+            + $"itemScale={item.transform.lossyScale}, headScale={head.lossyScale}, defaultPos={item.defaultPos}.");
     }
 }
