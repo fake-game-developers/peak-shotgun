@@ -86,107 +86,109 @@ public class Action_Gun : ItemAction
             character.AddForce(-forward * (Plugin.Recoil / Time.fixedDeltaTime));
         }
 
-        var struck = new List<Character>();
+        var struck = new HashSet<int>();
 
         for (int i = 0; i < pelletCount; i++)
         {
             Vector2 offset = PelletOffset(i, pelletCount, spread);
             Vector3 direction = (forward + right * offset.x + up * offset.y).normalized;
-            if (!PelletHit(origin, direction, out RaycastHit hit, out Character? character))
-            {
-                continue;
-            }
-
-            if (character == null || character == this.character || struck.Contains(character))
-            {
-                continue;
-            }
-
-            struck.Add(character);
-            Impact(character, hit.point, direction);
+            TryPellet(origin, direction, struck);
         }
 
         photonView.RPC(nameof(RPC_ShotgunBlastFX), RpcTarget.All, origin, forward);
     }
 
-    private bool PelletHit(Vector3 origin, Vector3 direction, out RaycastHit hit, out Character? struck)
+    private void TryPellet(Vector3 origin, Vector3 direction, HashSet<int> struck)
     {
-        struck = null;
         float distance = maxDistance;
         if (Physics.Raycast(origin, direction, out RaycastHit lineHit, maxDistance, HelperFunctions.terrainMapMask, QueryTriggerInteraction.Ignore))
         {
             distance = lineHit.distance;
-            hit = lineHit;
-        }
-        else
-        {
-            hit = default;
-            hit.point = origin + direction * maxDistance;
-            hit.distance = maxDistance;
         }
 
+        // Character + Default covers scouts/zombies, mobs, spiders, and most world items (mandrake, dynamite, spores).
         RaycastHit[] hits = Physics.SphereCastAll(
             origin,
             pelletRadius,
             direction,
             distance,
-            LayerMask.GetMask("Character"),
-            QueryTriggerInteraction.Ignore);
+            HelperFunctions.CharacterAndDefaultMask,
+            QueryTriggerInteraction.Collide);
 
-        float closest = float.MaxValue;
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
         foreach (RaycastHit candidate in hits)
         {
-            if (!candidate.collider || candidate.distance > closest)
+            if (!candidate.collider)
             {
                 continue;
             }
 
-            Character? character = candidate.collider.GetComponentInParent<Character>();
-            if (character == null || character == this.character)
+            int id = candidate.collider.transform.root.GetInstanceID();
+            if (struck.Contains(id))
             {
                 continue;
             }
 
-            closest = candidate.distance;
-            hit = candidate;
-            struck = character;
-        }
-
-        return true;
-    }
-
-    private void Impact(Character struck, Vector3 endpoint, Vector3 direction)
-    {
-        if (GunCharacterLaunch.IsZombie(struck))
-        {
-            GunCharacterLaunch? launch = struck.GetComponent<GunCharacterLaunch>();
-            if (struck.photonView.IsMine)
+            if (!ShotgunCombat.TryHit(candidate.collider, character, this, candidate.point, direction))
             {
-                launch?.Blast(direction, endpoint);
-            }
-            else
-            {
-                struck.photonView.RPC(nameof(GunCharacterLaunch.RPC_ShotgunBlast), RpcTarget.All, direction, endpoint);
+                continue;
             }
 
+            struck.Add(id);
             return;
         }
-
-        photonView.RPC(nameof(RPC_GunImpact), RpcTarget.All, struck.photonView.Owner, endpoint, direction);
     }
 
     [PunRPC]
-    private void RPC_GunImpact(Photon.Realtime.Player? hitPlayer, Vector3 endpoint, Vector3 direction)
+    public void RPC_GunImpact(Photon.Realtime.Player? hitPlayer, Vector3 endpoint, Vector3 direction)
     {
-        if (hitPlayer != null && hitPlayer.IsLocal)
+        if (hitPlayer == null || !hitPlayer.IsLocal)
         {
-            Character local = Character.localCharacter;
-            local.GetComponent<GunCharacterLaunch>().Blast(direction, endpoint);
-            foreach (Affliction affliction in afflictionsOnHit)
-            {
-                local.refs.afflictions.AddAffliction(affliction);
-            }
+            return;
         }
+
+        Character local = Character.localCharacter;
+        local.GetComponent<GunCharacterLaunch>().Blast(direction, endpoint);
+        if (!ShotgunCombat.FriendlyFire)
+        {
+            return;
+        }
+
+        foreach (Affliction affliction in afflictionsOnHit)
+        {
+            local.refs.afflictions.AddAffliction(affliction);
+        }
+    }
+
+    /// <summary>Host-only: destroy a networked object the shotgun hit (mandrake, spore cloud, etc.).</summary>
+    [PunRPC]
+    public void RPC_HostDestroyView(int viewId)
+    {
+        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
+        {
+            return;
+        }
+
+        PhotonView? view = PhotonView.Find(viewId);
+        if (view != null)
+        {
+            PhotonNetwork.Destroy(view.gameObject);
+        }
+    }
+
+    /// <summary>Host-only: break a spore bomb (<see cref="CloudFungus"/>).</summary>
+    [PunRPC]
+    public void RPC_HostBreakFungus(int viewId)
+    {
+        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
+        {
+            return;
+        }
+
+        PhotonView? view = PhotonView.Find(viewId);
+        CloudFungus? fungus = view != null ? view.GetComponent<CloudFungus>() : null;
+        fungus?.Break();
     }
 
     [PunRPC]

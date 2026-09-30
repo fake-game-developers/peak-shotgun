@@ -34,9 +34,17 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | Section | Key | Default | Meaning |
 |---|---|---|---|
 | `[Shotgun]` | `CanSpawnOnAnyBiome` | `false` | `false` = Roots luggage only (plus the two forced suitcases). `true` = can also roll in luggage in other biomes |
-| `[Shotgun]` | `Shots` | `5` | Shots per shotgun |
+| `[Shotgun]` | `Shots` | `5` | Shots per shotgun (host's value in multiplayer) |
 | `[Shotgun]` | `EnableRecoil` | `true` | Push the shooter back on each shot |
 | `[Shotgun]` | `Recoil` | `5` | Recoil strength in m/s (0–10) |
+| `[Combat]` | `FriendlyFire` | `true` | `true` = injure other scouts. `false` = knockback only, no Injury |
+| `[Shootables]` | `Zombies` | `true` | Hit / knock down zombies |
+| `[Shootables]` | `Mandrake` | `false` | Destroy mandrakes |
+| `[Shootables]` | `Beetles` | `false` | Kill beetles |
+| `[Shootables]` | `Spiders` | `false` | Stun spiders |
+| `[Shootables]` | `Spores` | `false` | Break spore bombs / clear spore clouds |
+| `[Shootables]` | `Scorpions` | `false` | Kill scorpions |
+| `[Shootables]` | `Dynamite` | `false` | Light dynamite fuses |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
 
 ## Install

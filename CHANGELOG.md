@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.6
+
+- Add `[Shootables]` toggles for zombies, mandrake, beetles, spiders, spores, scorpions, and dynamite (only zombies on by default)
+- Add `[Combat] FriendlyFire` (default on): off keeps scout knockback but removes Injury
+
 ## 1.0.5
 
 - Make luggage shotgun spawns much rarer when allowed outside Roots (`RidiculouslyRare` instead of `Common`)

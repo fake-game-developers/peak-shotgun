@@ -8,7 +8,7 @@
 		<Company>Arman Ossi Loko</Company>
 		<Copyright>Copyright (c) 2026 Fake Game Developers</Copyright>
 		<Description>A shotgun built from PEAK's blowgun. Blasts flip zombies harder than a coconut and dose them with drowsy.</Description>
-		<Version>1.0.5</Version>
+		<Version>1.0.6</Version>
 		<RootNamespace>Peak.Shotgun</RootNamespace>
 		<ThunderstorePackable>true</ThunderstorePackable>
 	</PropertyGroup>

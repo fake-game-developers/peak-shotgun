@@ -320,6 +320,7 @@ public partial class Plugin : BaseUnityPlugin
             "CanSpawnOnAnyBiome",
             false,
             "If false (default), shotguns only appear in Roots luggage. If true, they can also roll in luggage in other biomes. Roots always forces two random suitcases to contain a shotgun either way.");
+        ShotgunCombat.Bind(Config);
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
