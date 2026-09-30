@@ -8,7 +8,7 @@ repository = "https://thunderstore.io"
 namespace = "FakeGameDevelopers"
 name = "PeakShotgun"
 description = "A shotgun from PEAK's blowgun. Roots always has at least two luggage with one; optional any-biome spawns. Blasts flip zombies harder than a coconut."
-websiteUrl = "https://github.com/TheCodinPro/Peak_AKGun"
+websiteUrl = "https://github.com/fake-game-developers/peak-shotgun"
 containsNsfwContent = false
 
 [package.dependencies]
@@ -22,7 +22,7 @@ readme = "../../README.md"
 outdir = "../../artifacts/thunderstore/"
 
 [[build.copy]]
-source = "../../artifacts/bin/PeakShotgun/release/PeakShotgun.dll"
+source = "../../artifacts/bin/Peak.Shotgun/release/PeakShotgun.dll"
 target = "plugins/"
 
 [[build.copy]]
@@ -33,9 +33,18 @@ target = "/"
 source = "../../LICENSE"
 target = "/"
 
+# Explicit targets: tcli directory copy strips the first character of media filenames on Windows.
 [[build.copy]]
-source = "../../media/"
-target = "/media/"
+source = "../../media/img1.jpg"
+target = "/media/1.jpg"
+
+[[build.copy]]
+source = "../../media/img2.jpg"
+target = "/media/2.jpg"
+
+[[build.copy]]
+source = "../../media/img3.jpg"
+target = "/media/3.jpg"
 
 [publish]
 communities = [ "peak", ]

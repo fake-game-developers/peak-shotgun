@@ -1,10 +1,10 @@
 # peak-shotgun
 
-![Shotgun preview](media/preview1.jpg)
+![Shotgun preview](https://raw.githubusercontent.com/fake-game-developers/peak-shotgun/fix/held-pose-and-dither/media/img1.jpg)
 
-![Shotgun preview](media/preview2.jpg)
+![Shotgun preview](https://raw.githubusercontent.com/fake-game-developers/peak-shotgun/fix/held-pose-and-dither/media/img2.jpg)
 
-![Shotgun preview](media/preview3.jpg)
+![Shotgun preview](https://raw.githubusercontent.com/fake-game-developers/peak-shotgun/fix/held-pose-and-dither/media/img3.jpg)
 
 Turns PEAK's leftover blowgun into a shotgun.
 
@@ -89,5 +89,9 @@ Every push still builds that zip. Thunderstore publish runs only when `<Version>
 - Original author: **Arman Ossi Loko**
 - This mod belongs to **Fake Game Developers**
 - Based on [Peak_AKGun](https://github.com/TheCodinPro/Peak_AKGun) by TheCodinPro
+
+### Contributors
+
+- [bekto](https://github.com/bekto)
 
 Work based on this mod must credit Arman Ossi Loko and Fake Game Developers. See [LICENSE](LICENSE).

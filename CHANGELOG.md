@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Fix README preview images on the Thunderstore package page (absolute GitHub URLs)
+
 ## 1.0.0
 
 - Builds a shotgun from the blowgun already in PEAK, so the mod needs no extra files
