@@ -74,6 +74,8 @@ The item's `Hand_R` and `Hand_L` children set both position and rotation of the 
 
 A hand anchor is where the hand BONE goes, and that bone sits at the wrist end of the hand. The fist closes about 0.14 m along the bone's up (fingers) axis: vanilla anchors around a centred shaft measure Torch R 0.134, Torch L 0.160, RopeShooter R 0.141, with almost no offset along the palm normal. So `Hand_R` is placed `GripReach` (0.14) back along its fingers axis from the stock wrist centre. Putting the bone on the grip centre pushes the hand through the gun.
 
+Keep `defaultPos` inside arm's reach. `HoldItem` pulls the gun toward the target every `FixedUpdate`, while both hands are `FixedJoint`ed to it and the ragdoll arms pull back. If the target is out of reach, neither side wins cleanly, and where the gun settles depends on the arm pose at the end of the draw. At `Forward` 2.4 the logged gun sat 0.10–0.38 m ahead of the head bone (target 0.8 m) and 0.04–0.22 m right, sometimes through the chest. Compare `item` with `target` in the equip log line: they should nearly match.
+
 ### Gun dissolving near the camera
 
 W/Character (scout hands), W/Peak_Dither, W/Peak_Glass and W/Peak_Mirage read the screen position and dither away near the camera. Ordinary items (flare, dynamite, guidebook) use W/Peak_Standard, which does not. `ShotgunModelSwap.FindItemMaterial` copies the first catalog material whose shader is exactly `W/Peak_Standard`; if none exists it warns and falls back to the blowgun shader. `PlayerPos` only feeds foliage and water shaders; do not use it for items.

@@ -111,9 +111,10 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
         Vector3 Cam(Vector3 world) => c.InverseTransformPoint(world);
         Transform head = holder.GetBodypart(BodypartType.Head).transform;
         Plugin.Log.LogInfo(
-            $"Held shotgun (camera space): item={Cam(item.transform.position)}, anchorR={Cam(item.transform.Find("Hand_R").position)}, "
-            + $"anchorL={Cam(item.transform.Find("Hand_L").position)}, handR={Cam(holder.GetBodypart(BodypartType.Hand_R).transform.position)}, "
-            + $"handL={Cam(holder.GetBodypart(BodypartType.Hand_L).transform.position)}, headBone={Cam(head.position)}, "
+            $"Held shotgun (camera space): item={Cam(item.transform.position)}, target={Cam(holder.refs.items.GetItemHoldPos(item))}, "
+            + $"anchorR={Cam(item.transform.Find("Hand_R").position)}, anchorL={Cam(item.transform.Find("Hand_L").position)}, "
+            + $"handR={Cam(holder.GetBodypart(BodypartType.Hand_R).transform.position)}, handL={Cam(holder.GetBodypart(BodypartType.Hand_L).transform.position)}, "
+            + $"shoulderR={Cam(holder.GetBodypart(BodypartType.Arm_R).transform.position)}, headBone={Cam(head.position)}, "
             + $"itemScale={item.transform.lossyScale}, headScale={head.lossyScale}, defaultPos={item.defaultPos}.");
     }
 }
