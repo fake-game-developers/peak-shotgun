@@ -71,6 +71,13 @@ public class Action_Gun : ItemAction
 
         right.Normalize();
         Vector3 up = Vector3.Cross(forward, right);
+
+        // Bodypart forces are applied once per physics step, so this acceleration adds exactly Recoil m/s.
+        if (Plugin.Recoil > 0f)
+        {
+            character.AddForce(-forward * (Plugin.Recoil / Time.fixedDeltaTime));
+        }
+
         var struck = new List<Character>();
 
         for (int i = 0; i < pelletCount; i++)

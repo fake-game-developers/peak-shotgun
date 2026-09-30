@@ -21,6 +21,11 @@ internal static class ShoreTestSpawns
 
     internal static IEnumerator WhenTheShoreIsReady()
     {
+        if (!Plugin.DebugMode)
+        {
+            yield break;
+        }
+
         var wait = new WaitForSecondsRealtime(1f);
         bool spawnedShore = false;
         bool spawnedAirport = false;

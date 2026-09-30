@@ -30,6 +30,18 @@ public partial class Plugin : BaseUnityPlugin
 
     internal static float ModelScale { get; private set; } = 0.015f;
 
+    private static ConfigEntry<bool>? recoilEnabled;
+
+    private static ConfigEntry<float>? recoil;
+
+    /// <summary>m/s the shooter is pushed back along the aim per shot. 0 when disabled. Live.</summary>
+    internal static float Recoil => (recoilEnabled?.Value ?? true) ? Mathf.Max(0f, recoil?.Value ?? 2f) : 0f;
+
+    private static ConfigEntry<bool>? debugMode;
+
+    /// <summary>Host spawns test zombies, shotguns and luggage near the player on Airport / Shore.</summary>
+    internal static bool DebugMode => debugMode?.Value ?? false;
+
     // Held pose. These read the config entries live (not cached at startup), and Update() re-reads the
     // .cfg file when it changes, so the pose can be tuned while the game is running.
     private static ConfigEntry<float>? poseRight;
@@ -255,6 +267,9 @@ public partial class Plugin : BaseUnityPlugin
         Instance = this;
         Log = Logger;
         ShotCount = Mathf.Max(1, Config.Bind("Shotgun", "Shots", 5, "Shots in each shotgun.").Value);
+        recoilEnabled = Config.Bind("Shotgun", "EnableRecoil", true, "Push the shooter back on each shot. Strength is Recoil.");
+        recoil = Config.Bind("Shotgun", "Recoil", 2f, "Metres per second the shooter is pushed back, opposite the aim, on each shot. Used when EnableRecoil is true.");
+        debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
         // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.

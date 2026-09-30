@@ -42,7 +42,7 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 | `ZombieSilencePatch` | Stops a knocked-down zombie from playing its own sounds |
 | `ItemDatabasePatch` | Calls `CreateFromBlowgun` when `ItemDatabase.OnLoaded` finishes |
 | `RootsLuggagePatch` | Puts the shotgun in the first slot of Shore and Roots luggage rolls |
-| `ShoreTestSpawns` | Once per Shore load, the host spawns three zombies and one shotgun near the local player |
+| `ShoreTestSpawns` | Only with `[Debug] EnableDebugMode` (default off): the host spawns a shotgun and luggage at the Airport, and three zombies and one shotgun near the local player once per Shore load |
 
 ### Shot
 
@@ -53,6 +53,8 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 The shot sound is a runtime `SFX_Instance` built from `sounds/shotgun_fire_01.wav`. If that wav fails to load, the gun falls back to the blowgun's `shotSFX`. `ItemUseFeedback.sfxUsed` on the clone is cleared so the blowgun's use sound does not also play.
 
 Ammo count is the BepInEx key `Shots` in section `Shotgun` (`BepInEx/config/PeakShotgun.cfg`). Default 5. Values below 1 become 1. `item.totalUses` is that number, not `-1`.
+
+Recoil is `[Shotgun] EnableRecoil` (default true) and `[Shotgun] Recoil` (strength, default 2 m/s), both read live. `Fire` calls `Character.AddForce` on the shooter opposite the camera forward with `Recoil / fixedDeltaTime`: bodypart forces are applied once per physics step, so every bone gains exactly `Recoil` m/s. The shooter owns their character, so the push reaches other clients through normal character sync.
 
 ### Zombies
 

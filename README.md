@@ -25,8 +25,8 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 
 ## How to test
 
-1. Host a run. On the Shore, three zombies appear near you, and a Shotgun is on the ground in front of you. Shore and Roots luggage also contain one. It looks like the blowgun, because that is the model PEAK ships. It does not replace the blowgun.
-2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds and plays the shotgun fire sound. Each shotgun has 5 shots. After one launch, change `Shots` under `[Shotgun]` in the PeakShotgun config file in `BepInEx/config`.
+1. Set `EnableDebugMode = true` under `[Debug]` in the PeakShotgun config file in `BepInEx/config` (it appears after one launch). Host a run. On the Shore, three zombies appear near you, and a Shotgun is on the ground in front of you. With debug mode off (the default) nothing is spawned; Shore and Roots luggage still contain one. It looks like the blowgun, because that is the model PEAK ships. It does not replace the blowgun.
+2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds, plays the shotgun fire sound and pushes you back a little. Each shotgun has 5 shots. Change `Shots`, `EnableRecoil` (true/false) and `Recoil` (strength in m/s) under `[Shotgun]` in the same config file.
 3. Shoot another scout. They take a heavy Injury and get flipped. You cannot hit yourself.
 4. Shoot a zombie on the Shore. The first blast flips it, and it can get back up. The second blast knocks it out, and it stays down.
 
