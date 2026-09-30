@@ -9,8 +9,7 @@ namespace Peak.Shotgun;
 /// vertices (not renderer.bounds — that AABB-of-AABB sits below the gun after the flat-lay yaw).
 /// Do not raycast the luggage collider: open suitcases use a shell that sits the gun on the rim.
 /// </summary>
-// String target: PEAKGameLibs (CI) strips OffsetSpawn from Luggage; the live game DLL still has it.
-[HarmonyPatch(typeof(Luggage), "OffsetSpawn")]
+[HarmonyPatch(typeof(Luggage), nameof(Luggage.OffsetSpawn))]
 internal static class LuggageShotgunOffsetPatch
 {
     [HarmonyPostfix]
