@@ -10,5 +10,5 @@
 - Knocked-out zombies stop making sounds while the game still has them alive
 - Hotbar icon is a shotgun drawing
 - Each shot flashes a short light at the barrel
-- Placeholder shot sound is Lethal Company's shotgun blast
+- Shot fire sound is `shotgun_fire_01.wav`
 - Blasts flip zombies harder than a coconut and add Drowsy damage

@@ -22,8 +22,8 @@
 		<EmbeddedResource Include="icons\ShotgunIcon.png">
 			<LogicalName>Peak.Shotgun.icons.ShotgunIcon.png</LogicalName>
 		</EmbeddedResource>
-		<EmbeddedResource Include="sounds\ShotgunBlast.wav">
-			<LogicalName>Peak.Shotgun.sounds.ShotgunBlast.wav</LogicalName>
+		<EmbeddedResource Include="sounds\shotgun_fire_01.wav">
+			<LogicalName>Peak.Shotgun.sounds.shotgun_fire_01.wav</LogicalName>
 		</EmbeddedResource>
 		<EmbeddedResource Include="models\shotgun.obj">
 			<LogicalName>Peak.Shotgun.models.shotgun.obj</LogicalName>

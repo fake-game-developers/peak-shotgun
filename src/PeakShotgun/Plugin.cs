@@ -533,10 +533,10 @@ public partial class Plugin : BaseUnityPlugin
 
     private static SFX_Instance? PlaceholderShot()
     {
-        AudioClip? clip = LoadWav("Peak.Shotgun.sounds.ShotgunBlast.wav");
+        AudioClip? clip = LoadWav("Peak.Shotgun.sounds.shotgun_fire_01.wav");
         if (clip == null)
         {
-            Log.LogWarning("Placeholder shotgun shot was not found. Using the blowgun sound.");
+            Log.LogWarning("Shotgun fire sound was not found. Using the blowgun sound.");
             return null;
         }
 
@@ -600,7 +600,7 @@ public partial class Plugin : BaseUnityPlugin
 
         if (channels <= 0 || sampleRate <= 0 || bits != 16 || dataStart == 0 || dataStart + dataLength > wav.Length)
         {
-            Log.LogWarning("Placeholder shotgun shot is not 16-bit PCM.");
+            Log.LogWarning("Shotgun fire sound is not 16-bit PCM.");
             return null;
         }
 
@@ -612,7 +612,7 @@ public partial class Plugin : BaseUnityPlugin
             samples[i] = value / 32768f;
         }
 
-        var clip = AudioClip.Create("ShotgunBlast", sampleCount / channels, channels, sampleRate, false);
+        var clip = AudioClip.Create("shotgun_fire_01", sampleCount / channels, channels, sampleRate, false);
         clip.SetData(samples, 0);
         return clip;
     }
