@@ -33,9 +33,18 @@ target = "/"
 source = "../../LICENSE"
 target = "/"
 
+# Explicit targets: tcli directory copy strips the first character of media filenames on Windows.
 [[build.copy]]
-source = "../../media/"
-target = "/media/"
+source = "../../media/img1.jpg"
+target = "/media/1.jpg"
+
+[[build.copy]]
+source = "../../media/img2.jpg"
+target = "/media/2.jpg"
+
+[[build.copy]]
+source = "../../media/img3.jpg"
+target = "/media/3.jpg"
 
 [publish]
 communities = [ "peak", ]
