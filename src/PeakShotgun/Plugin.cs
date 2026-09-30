@@ -42,6 +42,36 @@ public partial class Plugin : BaseUnityPlugin
     /// <summary>Host spawns test zombies, shotguns and luggage near the player on Airport / Shore.</summary>
     internal static bool DebugMode => debugMode?.Value ?? false;
 
+    private static ConfigEntry<bool>? canSpawnOnAnyBiome;
+
+    /// <summary>
+    /// When false (default), luggage loot is Roots-only.
+    /// When true, the shotgun can also roll in luggage on any biome.
+    /// Roots always gets <see cref="GuaranteedLuggageShotguns"/> random forced suitcases, regardless of this flag.
+    /// </summary>
+    internal static bool CanSpawnOnAnyBiome => canSpawnOnAnyBiome?.Value ?? false;
+
+    /// <summary>How many random Roots luggage get a forced shotgun each run (anywhere on the Roots map).</summary>
+    internal const int GuaranteedLuggageShotguns = 2;
+
+    /// <summary>All PEAK luggage spawn pools (biome suitcases).</summary>
+    internal static readonly SpawnPool AllLuggagePools =
+        SpawnPool.LuggageBeach
+        | SpawnPool.LuggageJungle
+        | SpawnPool.LuggageTundra
+        | SpawnPool.LuggageCaldera
+        | SpawnPool.LuggageClimber
+        | SpawnPool.LuggageAncient
+        | SpawnPool.LuggageCursed
+        | SpawnPool.LuggageMesa
+        | SpawnPool.LuggageRoots
+        | SpawnPool.LuggageGloom
+        | SpawnPool.LuggageCitadel
+        | SpawnPool.LuggageClown;
+
+    internal static SpawnPool ShotgunLuggagePools =>
+        CanSpawnOnAnyBiome ? AllLuggagePools : SpawnPool.LuggageRoots;
+
     // Held pose. These read the config entries live (not cached at startup), and Update() re-reads the
     // .cfg file when it changes, so the pose can be tuned while the game is running.
     private static ConfigEntry<float>? poseRight;
@@ -271,6 +301,11 @@ public partial class Plugin : BaseUnityPlugin
         recoil = Config.Bind("Shotgun", "Recoil", 5f, new ConfigDescription(
             "Metres per second the shooter is pushed back, opposite the aim, on each shot. Used when EnableRecoil is true.",
             new AcceptableValueRange<float>(0f, 10f)));
+        canSpawnOnAnyBiome = Config.Bind(
+            "Shotgun",
+            "CanSpawnOnAnyBiome",
+            false,
+            "If false (default), shotguns only appear in Roots luggage. If true, they can also roll in luggage in other biomes. Roots always forces two random suitcases to contain a shotgun either way.");
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
@@ -346,6 +381,7 @@ public partial class Plugin : BaseUnityPlugin
         {
             Config.Reload();
             PoseVersion++;
+            ApplyLuggageSpawnConfig();
             LogPose("Config reloaded; held pose now");
         }
         catch (Exception e)
@@ -364,6 +400,7 @@ public partial class Plugin : BaseUnityPlugin
         }
 
         shoreSpawnRoutine = StartCoroutine(ShoreTestSpawns.WhenTheShoreIsReady());
+        RootsLuggagePatch.ResetGuarantees();
     }
 
     private IEnumerator WaitForBlowgun()
@@ -512,17 +549,40 @@ public partial class Plugin : BaseUnityPlugin
         ];
         gunObject.AddComponent<Action_Ammo>();
 
-        // Every Shore and Roots luggage includes one shotgun. Shore is for testing.
+        // Zombie-maps-only (default): Roots pool + Rare (first 1–2 Roots rolls are forced).
+        // Off: every luggage biome, Common roll, no force.
         LootData loot = gunObject.GetComponent<LootData>() ?? gunObject.AddComponent<LootData>();
-        loot.Rarity = Rarity.Common;
-        loot.spawnLocations = SpawnPool.LuggageBeach | SpawnPool.LuggageRoots;
         loot.banInSolo = false;
         loot.rarityOverrides.Clear();
+        ApplyLuggageSpawnConfig(loot);
         LootData.AllSpawnWeightData = null;
 
         new ItemContent(item).Register(ModDefinition.GetOrCreate(Info));
         ShotgunPrefab = gunObject;
-        Log.LogInfo("Registered the shotgun in every Shore and Roots luggage.");
+        Log.LogInfo(
+            CanSpawnOnAnyBiome
+                ? $"Registered the shotgun for all biomes' luggage ({GuaranteedLuggageShotguns} random Roots suitcases always forced)."
+                : $"Registered the shotgun for Roots luggage only ({GuaranteedLuggageShotguns} random suitcases always forced).");
+    }
+
+    /// <summary>Applies <see cref="CanSpawnOnAnyBiome"/> to the prefab loot table (startup + live config reload).</summary>
+    internal static void ApplyLuggageSpawnConfig(LootData? loot = null)
+    {
+        if (loot == null && ShotgunPrefab != null)
+        {
+            loot = ShotgunPrefab.GetComponent<LootData>();
+        }
+
+        if (loot == null)
+        {
+            return;
+        }
+
+        loot.spawnLocations = ShotgunLuggagePools;
+        // Rare when Roots-only so forced picks dominate; Common when all biomes so other maps can roll it.
+        loot.Rarity = CanSpawnOnAnyBiome ? Rarity.Common : Rarity.Rare;
+        LootData.AllSpawnWeightData = null;
+        RootsLuggagePatch.ResetGuarantees();
     }
 
     private static void ApplyIcon(Item item)

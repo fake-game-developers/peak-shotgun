@@ -111,8 +111,9 @@ internal static class ShoreTestSpawns
                     continue;
                 }
 
-                // Shore loot pool so RootsLuggagePatch injects a shotgun.
-                luggage.spawnPool = SpawnPool.LuggageBeach;
+                // Roots loot pool so RootsLuggagePatch injects a shotgun (zombie biome only).
+                // Debug luggage on the Airport/Shore still uses this pool so a shotgun appears for testing.
+                luggage.spawnPool = SpawnPool.LuggageRoots;
                 luggage.OpenImmediatelyNoNotify();
                 Plugin.Log.LogInfo($"Spawned test luggage '{prefabName}' at the {place}.");
                 return;

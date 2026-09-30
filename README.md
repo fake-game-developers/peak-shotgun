@@ -18,6 +18,26 @@ A blast throws eight pellets in a short cone, about every 0.85 seconds. Scouts w
 
 PEAK does not include a shotgun model. The mod builds the gun from the blowgun already in the game, names it Shotgun, and makes it fire on its own. Installing the mod is the whole setup.
 
+## Where it spawns
+
+- **Roots:** every run, **at least two random luggage** anywhere on the Roots map are forced to contain a shotgun. This always happens; no config turns it off.
+- **Other biomes:** by default the shotgun does **not** appear in luggage outside Roots.
+- Set `CanSpawnOnAnyBiome = true` under `[Shotgun]` in `BepInEx/config/PeakShotgun.cfg` to also allow random shotgun rolls in luggage on any biome. Roots still forces two suitcases either way.
+
+It looks like the blowgun, because that is the model PEAK ships. It does not replace the blowgun.
+
+## Configuration
+
+After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
+
+| Section | Key | Default | Meaning |
+|---|---|---|---|
+| `[Shotgun]` | `CanSpawnOnAnyBiome` | `false` | `false` = Roots luggage only (plus the two forced suitcases). `true` = can also roll in luggage in other biomes |
+| `[Shotgun]` | `Shots` | `5` | Shots per shotgun |
+| `[Shotgun]` | `EnableRecoil` | `true` | Push the shooter back on each shot |
+| `[Shotgun]` | `Recoil` | `5` | Recoil strength in m/s (0–10) |
+| `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
+
 ## Install
 
 1. Install the package with r2modman / Gale, **or** drop `PeakShotgun.dll` into `BepInEx/plugins/PeakShotgun/`.
@@ -25,10 +45,10 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 
 ## How to test
 
-1. Set `EnableDebugMode = true` under `[Debug]` in the PeakShotgun config file in `BepInEx/config` (it appears after one launch). Host a run. On the Shore, three zombies appear near you, and a Shotgun is on the ground in front of you. With debug mode off (the default) nothing is spawned; Shore and Roots luggage still contain one. It looks like the blowgun, because that is the model PEAK ships. It does not replace the blowgun.
-2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds, plays the shotgun fire sound and pushes you back a little. Each shotgun has 5 shots. Change `Shots`, `EnableRecoil` (true/false) and `Recoil` (strength in m/s, 0-10) under `[Shotgun]` in the same config file.
+1. Set `EnableDebugMode = true` under `[Debug]` in the PeakShotgun config file (it appears after one launch). Host a run. On the Shore, three zombies appear near you, and a Shotgun is on the ground in front of you. With debug mode off (the default) nothing is force-spawned there; open Roots luggage to find the two guaranteed shotguns.
+2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds, plays the shotgun fire sound and pushes you back a little. Each shotgun has 5 shots. Tune `Shots`, `EnableRecoil`, and `Recoil` under `[Shotgun]` as needed.
 3. Shoot another scout. They take a heavy Injury and get flipped. You cannot hit yourself.
-4. Shoot a zombie on the Shore. The first blast flips it, and it can get back up. The second blast knocks it out, and it stays down.
+4. Reach the Roots (Peak ascent or higher for natural zombies). Open luggage until you find a shotgun, then shoot a zombie. The first blast flips it, and it can get back up. The second blast knocks it out, and it stays down. Or use debug Shore zombies from step 1.
 
 ## Build
 

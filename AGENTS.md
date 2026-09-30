@@ -41,7 +41,7 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 | `GunCharacterLaunch` | Knockback and zombie knockdown. Owner-only physics. `Silenced` is set on the knockdown |
 | `ZombieSilencePatch` | Stops a knocked-down zombie from playing its own sounds |
 | `ItemDatabasePatch` | Calls `CreateFromBlowgun` when `ItemDatabase.OnLoaded` finishes |
-| `RootsLuggagePatch` | Puts the shotgun in the first slot of Shore and Roots luggage rolls |
+| `RootsLuggagePatch` | Always marks 2 random Roots suitcases per run and forces a shotgun into those. `CanSpawnOnAnyBiome` (default false) also allows random rolls in other biomes' luggage |
 | `ShoreTestSpawns` | Only with `[Debug] EnableDebugMode` (default off): the host spawns a shotgun and luggage at the Airport, and three zombies and one shotgun near the local player once per Shore load |
 
 ### Shot
