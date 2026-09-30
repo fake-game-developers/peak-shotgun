@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>netstandard2.1</TargetFramework>
+		<AssemblyName>PeakShotgun</AssemblyName>
+		<AssemblyTitle>PeakShotgun</AssemblyTitle>
+		<Authors>Arman Ossi Loko</Authors>
+		<Company>Arman Ossi Loko</Company>
+		<Copyright>Copyright (c) 2026 Fake Game Developers</Copyright>
+		<Description>A shotgun built from PEAK's blowgun. Blasts flip zombies harder than a coconut and dose them with drowsy.</Description>
+		<Version>1.0.0</Version>
+		<RootNamespace>PeakShotgun</RootNamespace>
+		<ThunderstorePackable>true</ThunderstorePackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="PEAKModding.PEAKLib.Core" Version="1.7.2" />
+		<PackageReference Include="PEAKModding.PEAKLib.Items" Version="1.6.2" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="icons\ShotgunIcon.png">
+			<LogicalName>PeakShotgun.icons.ShotgunIcon.png</LogicalName>
+		</EmbeddedResource>
+		<EmbeddedResource Include="sounds\ShotgunBlast.wav">
+			<LogicalName>PeakShotgun.sounds.ShotgunBlast.wav</LogicalName>
+		</EmbeddedResource>
+		<EmbeddedResource Include="models\shotgun.obj">
+			<LogicalName>PeakShotgun.models.shotgun.obj</LogicalName>
+		</EmbeddedResource>
+		<EmbeddedResource Include="models\shotgun_albedo_1k.png">
+			<LogicalName>PeakShotgun.models.shotgun_albedo.png</LogicalName>
+		</EmbeddedResource>
+	</ItemGroup>
+
+</Project>

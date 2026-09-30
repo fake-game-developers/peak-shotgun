@@ -1,0 +1,134 @@
+name: Thunderstore
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Download stripped PEAKGameLibs (CI references)
+        run: |
+          set -euo pipefail
+          mkdir -p .gamelibs
+          curl -fsSL "https://api.nuget.org/v3-flatcontainer/peakgamelibs/1.0.1/peakgamelibs.1.0.1.nupkg" -o peakgamelibs.nupkg
+          unzip -q peakgamelibs.nupkg -d .gamelibs-nupkg
+          cp -r .gamelibs-nupkg/lib/. .gamelibs/
+          test -f .gamelibs/Assembly-CSharp.dll
+          echo "ManagedDir=$PWD/.gamelibs"
+
+      - name: Build Thunderstore package
+        run: |
+          set -euo pipefail
+          MANAGED_DIR="$PWD/.gamelibs"
+          dotnet build peak-shotgun.slnx -c Release -target:PackTS -v m \
+            -p:ManagedDir="$MANAGED_DIR/" \
+            -p:PeakGameRootDir=""
+
+      - name: Flatten package for direct Thunderstore upload
+        id: package
+        run: |
+          set -euo pipefail
+          # GitHub Actions wraps artifacts in a zip. Upload the *contents* of the
+          # Thunderstore package so the downloaded artifact IS a valid TS zip.
+          mkdir -p ts-artifact
+          unzip -o artifacts/thunderstore/*.zip -d ts-artifact
+          test -f ts-artifact/manifest.json
+          test -f ts-artifact/icon.png
+          test -f ts-artifact/README.md
+          echo "path=ts-artifact" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Thunderstore-ready artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Downloaded filename will be FakeGameDevelopers-PeakShotgun.zip — upload that to Thunderstore.
+          name: FakeGameDevelopers-PeakShotgun
+          path: ts-artifact/*
+          if-no-files-found: error
+
+      - name: Decide whether to publish
+        id: publish
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          csproj=src/PeakShotgun/PeakShotgun.csproj
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$csproj")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            before="$BEFORE"
+          else
+            before=$(git rev-parse HEAD^)
+          fi
+
+          changed=false
+          if [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${before}^{commit}" 2>/dev/null; then
+            old=$(git show "${before}:$csproj" | sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p')
+            echo "Previous version: ${old:-<missing>}"
+            if [ "$version" != "$old" ]; then
+              changed=true
+            fi
+          else
+            echo "No previous commit to compare; treating the version as changed."
+            changed=true
+          fi
+
+          if [ "$changed" = true ]; then
+            live=$(curl -fsSL -A "peak-shotgun" "https://thunderstore.io/api/experimental/package/FakeGameDevelopers/PeakShotgun/" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["latest"]["version_number"])' \
+              || true)
+            if [ -n "$live" ] && [ "$version" = "$live" ]; then
+              echo "Version $version is already the live Thunderstore release."
+              changed=false
+            fi
+          fi
+
+          echo "Version $version; publish=$changed"
+          echo "publish=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Reuse Thunderstore categories
+        if: steps.publish.outputs.publish == 'true'
+        run: python3 .github/scripts/reuse-thunderstore-categories.py
+
+      - name: Publish to Thunderstore
+        if: steps.publish.outputs.publish == 'true'
+        env:
+          TCLI_AUTH_TOKEN: ${{ secrets.TCLI_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TCLI_AUTH_TOKEN:-}" ]; then
+            echo "TCLI_AUTH_TOKEN secret is not set."
+            exit 1
+          fi
+          MANAGED_DIR="$PWD/.gamelibs"
+          dotnet build peak-shotgun.slnx -c Release -target:PackTS -v m \
+            -p:ManagedDir="$MANAGED_DIR/" \
+            -p:PeakGameRootDir="" \
+            -p:PublishTS=true
+
+      - name: Attach package to GitHub Release (manual runs)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "build-${{ github.run_number }}"
+          name: "Thunderstore build ${{ github.run_number }}"
+          files: artifacts/thunderstore/*.zip
+          generate_release_notes: true
+          draft: true
