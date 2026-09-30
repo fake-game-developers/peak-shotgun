@@ -71,7 +71,7 @@ The DLL is `artifacts/bin/Peak.Shotgun/release/PeakShotgun.dll`.
 
 Every push to `master` runs [.github/workflows/thunderstore.yml](.github/workflows/thunderstore.yml):
 
-1. Builds a Thunderstore ZIP (using stripped PEAK Managed refs from the [`ci-refs` release](https://github.com/fake-game-developers/peak-shotgun/releases/tag/ci-refs) for compile references)
+1. Builds a Thunderstore ZIP (using stripped [PEAKGameLibs](https://www.nuget.org/packages/PEAKGameLibs) for compile references)
 2. Uploads a workflow artifact named **`FakeGameDevelopers-PeakShotgun`**
 
 Every push still builds that zip. Thunderstore publish runs only when `<Version>` in `src/PeakShotgun/Peak.Shotgun.csproj` changes, and the organization secret `TCLI_AUTH_TOKEN` is set. The publish step copies the categories already on the package, so a new version keeps the same tags. A commit that leaves the version unchanged only builds the artifact.
