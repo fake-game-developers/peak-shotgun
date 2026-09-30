@@ -90,4 +90,8 @@ Every push still builds that zip. Thunderstore publish runs only when `<Version>
 - This mod belongs to **Fake Game Developers**
 - Based on [Peak_AKGun](https://github.com/TheCodinPro/Peak_AKGun) by TheCodinPro
 
+### Contributors
+
+- [bekto](https://github.com/bekto)
+
 Work based on this mod must credit Arman Ossi Loko and Fake Game Developers. See [LICENSE](LICENSE).
