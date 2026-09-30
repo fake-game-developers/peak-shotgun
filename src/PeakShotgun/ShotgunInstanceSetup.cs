@@ -13,6 +13,8 @@ internal sealed class ShotgunInstanceSetup : MonoBehaviour
 
     internal Item? Item { get; private set; }
 
+    private bool appliedShotCount;
+
     private void Awake()
     {
         Item = GetComponent<Item>();
@@ -57,6 +59,43 @@ internal sealed class ShotgunInstanceSetup : MonoBehaviour
         if (visual != null && visual.GetComponent<ShotgunVisualOrient>() == null)
         {
             visual.gameObject.AddComponent<ShotgunVisualOrient>();
+        }
+    }
+
+    private void Start() => TryApplyShotCount();
+
+    private void Update()
+    {
+        // Networked items can get data a frame or two after Start; retry briefly.
+        if (!appliedShotCount)
+        {
+            TryApplyShotCount();
+        }
+    }
+
+    private void TryApplyShotCount()
+    {
+        if (appliedShotCount || Item == null)
+        {
+            return;
+        }
+
+        // Prefab / inactive template: never invent instance data on the shared object.
+        if (!gameObject.scene.IsValid() || !gameObject.activeInHierarchy)
+        {
+            return;
+        }
+
+        try
+        {
+            // New spawns always take the live Shots value (map restart after a .cfg edit).
+            Plugin.ApplyShotCountToItem(Item, forceFullMagazine: true);
+            appliedShotCount = true;
+            ShotgunAmmoUI.Refresh();
+        }
+        catch (System.Exception)
+        {
+            // Item instance data not ready yet; Update will retry.
         }
     }
 

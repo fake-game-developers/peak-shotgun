@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3
+
+- Changing `Shots` in the config now applies on a new map without quitting PEAK
+- Newly spawned shotguns always use the current `Shots` value
+
 ## 1.0.2
 
 - CI publish test bump

@@ -26,7 +26,10 @@ public partial class Plugin : BaseUnityPlugin
 
     internal static GameObject? ShotgunPrefab { get; private set; }
 
-    internal static int ShotCount { get; private set; } = 5;
+    private static ConfigEntry<int>? shots;
+
+    /// <summary>Shots in each shotgun. Live from config; at least 1.</summary>
+    internal static int ShotCount => Mathf.Max(1, shots?.Value ?? 5);
 
     internal static float ModelScale { get; private set; } = 0.015f;
 
@@ -296,7 +299,9 @@ public partial class Plugin : BaseUnityPlugin
     {
         Instance = this;
         Log = Logger;
-        ShotCount = Mathf.Max(1, Config.Bind("Shotgun", "Shots", 5, "Shots in each shotgun.").Value);
+        shots = Config.Bind("Shotgun", "Shots", 5, new ConfigDescription(
+            "Shots in each shotgun. Save the .cfg and start a new map (no need to quit PEAK).",
+            new AcceptableValueRange<int>(1, 999)));
         recoilEnabled = Config.Bind("Shotgun", "EnableRecoil", true, "Push the shooter back on each shot. Strength is Recoil.");
         recoil = Config.Bind("Shotgun", "Recoil", 5f, new ConfigDescription(
             "Metres per second the shooter is pushed back, opposite the aim, on each shot. Used when EnableRecoil is true.",
@@ -376,24 +381,98 @@ public partial class Plugin : BaseUnityPlugin
             return;
         }
 
-        lastConfigWriteUtc = write;
+        ReloadConfigFromDisk("cfg changed");
+    }
+
+    /// <summary>
+    /// Re-reads <c>PeakShotgun.cfg</c> from disk into the live entries, then applies ammo / loot / pose.
+    /// Map restart calls this so you do not need to quit PEAK after editing the file.
+    /// </summary>
+    private void ReloadConfigFromDisk(string reason)
+    {
         try
         {
+            lastConfigWriteUtc = SafeConfigWriteTime();
             Config.Reload();
             PoseVersion++;
             ApplyLuggageSpawnConfig();
-            LogPose("Config reloaded; held pose now");
+            ApplyShotCountConfig();
+            LogPose($"Config reloaded ({reason}); held pose now");
+            Log.LogInfo($"Config reloaded ({reason}); shots per shotgun now {ShotCount}.");
         }
         catch (Exception e)
         {
-            Log.LogWarning($"Config reload failed (pose unchanged): {e.Message}");
+            Log.LogWarning($"Config reload failed ({reason}): {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// Writes <see cref="ShotCount"/> onto the prefab and every live shotgun so a .cfg edit
+    /// (or map reload that spawns from that prefab) is not stuck on the Awake-time value.
+    /// </summary>
+    internal static void ApplyShotCountConfig()
+    {
+        int count = ShotCount;
+        if (ShotgunPrefab != null)
+        {
+            Item? prefabItem = ShotgunPrefab.GetComponent<Item>();
+            if (prefabItem != null)
+            {
+                // Prefab only: do not touch ItemUses (that is per-instance networked data).
+                prefabItem.totalUses = count;
+            }
+        }
+
+        foreach (ShotgunInstanceSetup setup in ShotgunInstanceSetup.Active)
+        {
+            if (setup == null || setup.Item == null)
+            {
+                continue;
+            }
+
+            // Live guns: only refill when the magazine was still full at the old size.
+            ApplyShotCountToItem(setup.Item, forceFullMagazine: false);
+        }
+
+        ShotgunAmmoUI.Refresh();
+    }
+
+    /// <summary>
+    /// Sets <see cref="Item.totalUses"/> from config.
+    /// <paramref name="forceFullMagazine"/> is for freshly spawned guns (always take the current Shots value).
+    /// Otherwise full magazines refill to the new count; partially spent guns keep remaining shots.
+    /// </summary>
+    internal static void ApplyShotCountToItem(Item item, bool forceFullMagazine)
+    {
+        int count = ShotCount;
+        OptionableIntItemData data = item.GetData<OptionableIntItemData>(DataEntryKey.ItemUses);
+        bool wasFull = !data.HasData || data.Value < 0 || data.Value >= item.totalUses;
+        item.totalUses = count;
+
+        if (forceFullMagazine || !data.HasData || data.Value < 0 || wasFull)
+        {
+            data.HasData = true;
+            data.Value = count;
+            item.SetUseRemainingPercentage(1f);
+            return;
+        }
+
+        if (data.Value > count)
+        {
+            data.Value = count;
+        }
+
+        item.SetUseRemainingPercentage(count > 0 ? data.Value / (float)count : 0f);
     }
 
     private Coroutine? shoreSpawnRoutine;
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // Always re-read the .cfg here: map restart must see edits made while PEAK stayed open.
+        // The Update() poll can lose a race with luggage / debug spawns on the new scene.
+        ReloadConfigFromDisk("map load");
+
         if (shoreSpawnRoutine != null)
         {
             StopCoroutine(shoreSpawnRoutine);
