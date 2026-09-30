@@ -239,6 +239,7 @@ Config.Build.user.props
 Thumbs.db
 
 .gamelibs/
+.gamelibs-nupkg/
 peakgamelibs.nupkg
 
 # Rider
