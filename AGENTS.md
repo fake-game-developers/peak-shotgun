@@ -76,6 +76,8 @@ A hand anchor is where the hand BONE goes, and that bone sits at the wrist end o
 
 While equipping, `CharacterItems.Equip` places the item at `GetItemHoldPos(item, pushOffTerrain: true)` before `AttachItem` joins both hands to it where it sits. The push casts a ray from the hip toward the hold point, and on any Terrain/Map hit it shortens the offset to `max(hit, 0.2) - 0.4`. For a close hit that is zero or negative, which attaches the gun inside or behind the body. That is the "sometimes the idle pose goes through the chest" bug. The shotgun's hold point is far out and low, so the ray often hits the floor or a nearby wall. `ShotgunHoldPosPatch` always returns the unpushed point for the shotgun and logs `Equip: ignored pushOffTerrain…` when it changes something. Held colliders are triggers, so nothing needs pushing.
 
+In a backpack, `Item.PutInBackpackRPC` snaps the item root to the slot transform and `SetState(InBackpack)` halves its scale (`forceScale`). `ShotgunVisualOrient` then stands the mesh upright on the slot, muzzle up (`BackpackRotation`), at `BackpackScale` (1.4×).
+
 ### Gun dissolving near the camera
 
 W/Character (scout hands), W/Peak_Dither, W/Peak_Glass and W/Peak_Mirage read the screen position and dither away near the camera. Ordinary items (flare, dynamite, guidebook) use W/Peak_Standard, which does not. `ShotgunModelSwap.FindItemMaterial` copies the first catalog material whose shader is exactly `W/Peak_Standard`; if none exists it warns and falls back to the blowgun shader. `PlayerPos` only feeds foliage and water shaders; do not use it for items.
