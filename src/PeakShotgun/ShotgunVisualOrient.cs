@@ -4,7 +4,7 @@ namespace PeakShotgun;
 
 /// <summary>
 /// Lives on the ShotgunVisual child so networked clones cannot lose the mesh reference.
-/// Switches rest vs held local pose every frame from the parent Item state.
+/// Switches held / backpack / luggage / rest local pose every frame from the parent Item state.
 /// </summary>
 internal sealed class ShotgunVisualOrient : MonoBehaviour
 {
@@ -45,24 +45,10 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
             luggageRest.Armed = false;
         }
 
-        if (lastHeld == held)
-        {
-            // Still re-apply while held so nothing else can leave us stuck in rest pose.
-            // Also re-apply armed luggage pose so ground rest cannot wipe the diagonal.
-            if (!held)
-            {
-                if (luggageRest != null && luggageRest.Armed)
-                {
-                    transform.localPosition = luggageRest.LocalPosition;
-                    transform.localRotation = luggageRest.LocalRotation;
-                }
-
-                return;
-            }
-        }
-
         bool justHeld = held && lastHeld != true;
         lastHeld = held;
+        bool inBackpack = !held && item != null && item.itemState == ItemState.InBackpack;
+        transform.localScale = Vector3.one * (Plugin.ModelScale * (inBackpack ? BackpackScale : 1f));
         if (held)
         {
             transform.localPosition = Plugin.HeldLocalPosition;
@@ -71,6 +57,12 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
             {
                 LogHeldGeometry();
             }
+        }
+        else if (inBackpack)
+        {
+            // Strapped upright on the pack: the barrel (mesh -X) points up the slot, the top (mesh +Z) faces out.
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = BackpackRotation;
         }
         else if (luggageRest != null && luggageRest.Armed)
         {
@@ -83,6 +75,12 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
             transform.localRotation = Plugin.RestLocalRotation;
         }
     }
+
+    // Item.SetState(InBackpack) halves the item root (forceScale); this grows the gun back part of the way.
+    private const float BackpackScale = 1.4f;
+
+    // Maps mesh -X (muzzle) to item +Y and keeps mesh +Z on item +Z.
+    private static readonly Quaternion BackpackRotation = Quaternion.LookRotation(Vector3.forward, Vector3.right);
 
     /// <summary>
     /// One line per equip, in camera space (+X right, +Y up, +Z forward), so the [HoldPose] values can be
