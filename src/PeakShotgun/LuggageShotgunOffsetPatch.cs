@@ -5,9 +5,9 @@ namespace Peak.Shotgun;
 
 /// <summary>
 /// PEAK centers luggage items on mainRenderer.bounds, then applies offsetLuggagePosition.
-/// After OffsetSpawn: pin the visual flat, then seat the mesh bottom on a real floor hit
-/// (raycast into the suitcase). Reconstructing the floor from bounds is intermittent and
-/// leaves the gun sunk into the lining.
+/// After OffsetSpawn: pin the visual flat on the suitcase floor, then seat using the real mesh
+/// vertices (not renderer.bounds — that AABB-of-AABB sits below the gun after the flat-lay yaw).
+/// Do not raycast the luggage collider: open suitcases use a shell that sits the gun on the rim.
 /// </summary>
 [HarmonyPatch(typeof(Luggage), nameof(Luggage.OffsetSpawn))]
 internal static class LuggageShotgunOffsetPatch
@@ -33,6 +33,14 @@ internal static class LuggageShotgunOffsetPatch
 
         Vector3 up = __instance.transform.up;
 
+        // Spawn spot / floor plane from PEAK's placement (Center on spot, then offset lift).
+        // Capture before undoing the lift — that plane is the cavity floor, not the collider lid.
+        Renderer? renderer = item.mainRenderer;
+        Vector3 spawnSpot = renderer != null
+            ? renderer.bounds.center - __instance.transform.rotation * item.offsetLuggagePosition
+            : item.transform.position - __instance.transform.rotation * item.offsetLuggagePosition;
+        float floorAlongUp = Vector3.Dot(spawnSpot, up);
+
         // Undo PEAK's half-height lift — we reseat from the flat-lay pose ourselves.
         item.transform.position -= __instance.transform.rotation * item.offsetLuggagePosition;
 
@@ -46,17 +54,6 @@ internal static class LuggageShotgunOffsetPatch
         pose.LocalPosition = luggagePos;
         pose.LocalRotation = luggageRot;
         pose.Armed = true;
-
-        string floorSource;
-        if (!TryFloorAlongUp(__instance, item, up, out float floorAlongUp))
-        {
-            floorAlongUp = FallbackFloorAlongUp(item, up);
-            floorSource = "bounds-fallback";
-        }
-        else
-        {
-            floorSource = "raycast";
-        }
 
         float minAlongUp = MinMeshAlongUp(visual, mesh, up);
         float delta = floorAlongUp - minAlongUp + Plugin.LuggageLiftExtra;
@@ -82,87 +79,7 @@ internal static class LuggageShotgunOffsetPatch
         item.GetComponent<ShotgunPhysics>()?.Apply();
         item.ForceSyncForFrames();
         Plugin.Log.LogInfo(
-            $"Luggage seat yaw={Plugin.LuggageYaw:0.#}° Δ={delta:0.###} ({floorSource}, liftExtra={Plugin.LuggageLiftExtra:0.###}).");
-    }
-
-    /// <summary>
-    /// Cast down onto the suitcase mesh after the flat-lay pose. Ignores the gun and other loot
-    /// so the mesh bottom lands on the lining, not halfway through gloves.
-    /// </summary>
-    private static bool TryFloorAlongUp(Luggage luggage, Item item, Vector3 up, out float floorAlongUp)
-    {
-        floorAlongUp = 0f;
-
-        Renderer? renderer = item.mainRenderer;
-        if (renderer == null)
-        {
-            return false;
-        }
-
-        Bounds bounds = renderer.bounds;
-        float probeHeight = Mathf.Max(bounds.extents.magnitude, 0.25f) + 0.35f;
-        Vector3 origin = bounds.center + up * probeHeight;
-        float maxDistance = probeHeight + Mathf.Max(bounds.extents.magnitude, 0.25f) + 1.5f;
-
-        RaycastHit[] hits = Physics.RaycastAll(
-            origin,
-            -up,
-            maxDistance,
-            ~0,
-            QueryTriggerInteraction.Ignore);
-
-        Collider[] self = item.colliders != null && item.colliders.Length > 0
-            ? item.colliders
-            : item.GetComponentsInChildren<Collider>(true);
-
-        float bestAlongUp = float.NegativeInfinity;
-        bool found = false;
-        foreach (RaycastHit hit in hits)
-        {
-            if (hit.collider == null || IsOwnCollider(hit.collider, self))
-            {
-                continue;
-            }
-
-            if (hit.collider.GetComponentInParent<Luggage>() != luggage)
-            {
-                continue;
-            }
-
-            float along = Vector3.Dot(hit.point, up);
-            if (along > bestAlongUp)
-            {
-                bestAlongUp = along;
-                found = true;
-            }
-        }
-
-        if (!found)
-        {
-            return false;
-        }
-
-        floorAlongUp = bestAlongUp;
-        return true;
-    }
-
-    private static float FallbackFloorAlongUp(Item item, Vector3 up)
-    {
-        // PEAK lift already undone; item root sits where Center() put the spawn spot.
-        return Vector3.Dot(item.transform.position, up);
-    }
-
-    private static bool IsOwnCollider(Collider hit, Collider[] self)
-    {
-        foreach (Collider collider in self)
-        {
-            if (collider != null && collider == hit)
-            {
-                return true;
-            }
-        }
-
-        return false;
+            $"Luggage seat yaw={Plugin.LuggageYaw:0.#}° Δ={delta:0.###} (spawn-spot, liftExtra={Plugin.LuggageLiftExtra:0.###}).");
     }
 
     private static float MinMeshAlongUp(Transform visual, Mesh mesh, Vector3 up)
