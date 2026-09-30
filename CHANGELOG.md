@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- CI publish test bump
+
 ## 1.0.1
 
 - Fix README preview images on the Thunderstore package page (absolute GitHub URLs)
