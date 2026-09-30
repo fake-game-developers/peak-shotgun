@@ -35,7 +35,7 @@ public partial class Plugin : BaseUnityPlugin
     private static ConfigEntry<float>? recoil;
 
     /// <summary>m/s the shooter is pushed back along the aim per shot, 0-10. 0 when disabled. Live.</summary>
-    internal static float Recoil => (recoilEnabled?.Value ?? true) ? recoil?.Value ?? 2f : 0f;
+    internal static float Recoil => (recoilEnabled?.Value ?? true) ? recoil?.Value ?? 5f : 0f;
 
     private static ConfigEntry<bool>? debugMode;
 
@@ -268,7 +268,7 @@ public partial class Plugin : BaseUnityPlugin
         Log = Logger;
         ShotCount = Mathf.Max(1, Config.Bind("Shotgun", "Shots", 5, "Shots in each shotgun.").Value);
         recoilEnabled = Config.Bind("Shotgun", "EnableRecoil", true, "Push the shooter back on each shot. Strength is Recoil.");
-        recoil = Config.Bind("Shotgun", "Recoil", 2f, new ConfigDescription(
+        recoil = Config.Bind("Shotgun", "Recoil", 5f, new ConfigDescription(
             "Metres per second the shooter is pushed back, opposite the aim, on each shot. Used when EnableRecoil is true.",
             new AcceptableValueRange<float>(0f, 10f)));
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");

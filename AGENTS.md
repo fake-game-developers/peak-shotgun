@@ -54,7 +54,7 @@ The shot sound is a runtime `SFX_Instance` built from `sounds/shotgun_fire_01.wa
 
 Ammo count is the BepInEx key `Shots` in section `Shotgun` (`BepInEx/config/PeakShotgun.cfg`). Default 5. Values below 1 become 1. `item.totalUses` is that number, not `-1`.
 
-Recoil is `[Shotgun] EnableRecoil` (default true) and `[Shotgun] Recoil` (strength, default 2 m/s, `AcceptableValueRange` 0-10 so BepInEx clamps larger values to 10), both read live. `Fire` calls `Character.AddForce` on the shooter opposite the camera forward with `Recoil / fixedDeltaTime`: bodypart forces are applied once per physics step, so every bone gains exactly `Recoil` m/s. The shooter owns their character, so the push reaches other clients through normal character sync.
+Recoil is `[Shotgun] EnableRecoil` (default true) and `[Shotgun] Recoil` (strength, default 5 m/s, `AcceptableValueRange` 0-10 so BepInEx clamps larger values to 10), both read live. `Fire` calls `Character.AddForce` on the shooter opposite the camera forward with `Recoil / fixedDeltaTime`: bodypart forces are applied once per physics step, so every bone gains exactly `Recoil` m/s. The shooter owns their character, so the push reaches other clients through normal character sync.
 
 ### Zombies
 
