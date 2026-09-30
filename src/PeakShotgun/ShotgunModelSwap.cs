@@ -49,9 +49,9 @@ internal static class ShotgunModelSwap
 
         var muzzle = new GameObject("ShotgunMuzzle");
         muzzle.transform.SetParent(visual.transform, false);
-        // After OBJ X-flip the muzzle is on min.x (stock on max.x).
+        // Barrel end, facing out of the barrel: mesh -X is the aim, mesh +Z is the top.
         muzzle.transform.localPosition = Plugin.MuzzleMeshPoint;
-        muzzle.transform.localRotation = Quaternion.identity;
+        muzzle.transform.localRotation = Quaternion.LookRotation(Vector3.left, Vector3.forward);
 
         Item? item = gunObject.GetComponent<Item>();
         if (item != null)

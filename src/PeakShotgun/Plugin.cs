@@ -62,7 +62,7 @@ public partial class Plugin : BaseUnityPlugin
     internal static float HeldToeIn => poseToeIn?.Value ?? -6f;
 
     /// <summary>Degrees the gun pitches about the grip: muzzle up, stock down. 0 = level with the aim.</summary>
-    internal static float HeldMuzzleUp => poseMuzzleUp?.Value ?? 12f;
+    internal static float HeldMuzzleUp => poseMuzzleUp?.Value ?? 8f;
 
     /// <summary>Bumped whenever the .cfg file changes on disk so held guns re-place their hand anchors.</summary>
     internal static int PoseVersion { get; private set; }
@@ -133,7 +133,9 @@ public partial class Plugin : BaseUnityPlugin
         GripMeshPoint = wrist.center;
         // Palm under the pump: hand bone at the pump's underside.
         ForendMeshPoint = new Vector3(pump.center.x, pump.center.y, pump.min.z);
-        MuzzleMeshPoint = new Vector3(b.min.x, b.center.y, b.center.z);
+        // Barrel end: centre of the tip slice. Whole-mesh bounds put it 15 cm low and 7 cm to the side.
+        Bounds tip = SliceBounds(vertices, b, 0f, 0.02f);
+        MuzzleMeshPoint = new Vector3(b.min.x, tip.center.y, tip.center.z);
 
         RestMeshLift = -MinRestYInItemSpace(mesh.vertices, new Vector3(RestPosX, RestPosY, RestPosZ));
         Log?.LogInfo(
@@ -263,7 +265,7 @@ public partial class Plugin : BaseUnityPlugin
         poseLeftHandLeft = Config.Bind("HoldPose", "LeftHandLeft", 0.09f, "Metres the left hand sits left of the pump centre. Negative = right.");
         poseRightWristTilt = Config.Bind("HoldPose", "RightWristTiltDegrees", 30f, "Degrees the right hand's fingers tip up on the grip. Bigger = right elbow lower. 0 = the vanilla RopeShooter grip.");
         poseToeIn = Config.Bind("HoldPose", "ToeInDegrees", -6f, "Degrees the barrel turns left toward the crosshair. Negative = barrel turns right. 0 = parallel to the aim.");
-        poseMuzzleUp = Config.Bind("HoldPose", "MuzzleUpDegrees", 12f, "Degrees the gun pitches about the grip: muzzle up and stock down. 0 = level with the aim. Negative = stock up.");
+        poseMuzzleUp = Config.Bind("HoldPose", "MuzzleUpDegrees", 8f, "Degrees the gun pitches about the grip: muzzle up and stock down. 0 = level with the aim. Negative = stock up.");
         // Extra euler applied on top of the barrel→forward / top→up base alignment. Leave at 0 unless tuning.
         ModelRotX = Config.Bind("Model", "RotX", 0f, "Extra held local X euler on top of barrel-forward alignment.").Value;
         ModelRotY = Config.Bind("Model", "RotY", 0f, "Extra held local Y euler on top of barrel-forward alignment.").Value;

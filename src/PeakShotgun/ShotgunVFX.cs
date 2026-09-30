@@ -83,11 +83,6 @@ public class ShotgunVFX : MonoBehaviour
 
     public void Play(Vector3 origin, Vector3 forward)
     {
-        if (forward.sqrMagnitude < 0.001f)
-        {
-            forward = transform.forward;
-        }
-
         if (flashLight == null)
         {
             foreach (Light light in GetComponentsInChildren<Light>(true))
@@ -100,10 +95,22 @@ public class ShotgunVFX : MonoBehaviour
             }
         }
 
-        Vector3 point = origin + forward.normalized * 0.4f;
+        // The light hangs off ShotgunMuzzle, whose forward is the barrel. Use this client's own muzzle so the
+        // flash and smoke leave the barrel end along the barrel, not along the shooter's camera ray.
+        Transform? muzzle = flashLight != null ? flashLight.transform.parent : null;
+        Vector3 point = muzzle != null ? muzzle.position : origin;
+        if (muzzle != null)
+        {
+            forward = muzzle.forward;
+        }
+        else if (forward.sqrMagnitude < 0.001f)
+        {
+            forward = transform.forward;
+        }
+
         if (flashLight != null)
         {
-            flashLight.transform.position = point;
+            flashLight.transform.localPosition = Vector3.forward * 0.05f;
             flashLight.intensity = 18f;
             lightTime = LightSeconds;
         }

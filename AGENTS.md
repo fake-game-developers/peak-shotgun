@@ -48,7 +48,7 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 
 `Action_Gun.Fire` spends one use, plays `shotSFX`, and raycasts `pelletCount` pellets (default 8) inside `spread`. One character is damaged once per shot. Scouts get the afflictions on `Action_Gun` (Injury). Zombies do not: Injury does not affect them, so zombie hits go to `GunCharacterLaunch` instead.
 
-`RPC_ShotgunBlastFX` runs on every client. It only flashes `ShotgunVFX` and shakes the camera. It does not spawn the blowgun dart puff.
+`RPC_ShotgunBlastFX` runs on every client. It only flashes `ShotgunVFX` and shakes the camera. It does not spawn the blowgun dart puff. `ShotgunVFX.Play` puts the flash and smoke at that client's own `ShotgunMuzzle` and points them along it. `ShotgunMuzzle` sits at the centre of the barrel-end mesh slice (`Plugin.UpdateMeshAnchors`) with its forward along the barrel. Pellets start there but fly along the shooter's camera forward.
 
 The placeholder shot is a runtime `SFX_Instance` built from `sounds/ShotgunBlast.wav`. If that wav fails to load, the gun falls back to the blowgun's `shotSFX`. `ItemUseFeedback.sfxUsed` on the clone is cleared so the blowgun's use sound does not also play.
 
