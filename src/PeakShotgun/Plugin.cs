@@ -55,11 +55,11 @@ public partial class Plugin : BaseUnityPlugin
     /// </summary>
     internal static Vector3 HeldDefaultPos => new(
         poseRight?.Value ?? 0.65f,
-        poseUp?.Value ?? 0f,
+        poseUp?.Value ?? -0.15f,
         poseForward?.Value ?? 1.45f);
 
     /// <summary>Degrees the barrel turns toward the crosshair (left, since the gun sits on the right).</summary>
-    internal static float HeldToeIn => poseToeIn?.Value ?? 5f;
+    internal static float HeldToeIn => poseToeIn?.Value ?? 2f;
 
     /// <summary>Degrees the muzzle tips up. FPS guns sit below the crosshair and angle slightly up to it.</summary>
     internal static float HeldMuzzleUp => poseMuzzleUp?.Value ?? 2f;
@@ -258,11 +258,11 @@ public partial class Plugin : BaseUnityPlugin
         // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.
         // These are live: edit and save the .cfg while the game runs and the pose updates within a second.
         poseRight = Config.Bind("HoldPose", "Right", 0.65f, "Item.defaultPos.x: how far right of the head the gun and both hands are held. 0 = centred.");
-        poseUp = Config.Bind("HoldPose", "Up", 0f, "Item.defaultPos.y: height above the head bone. The blowgun uses 0.33 (mouth). Bigger = higher on screen.");
+        poseUp = Config.Bind("HoldPose", "Up", -0.15f, "Item.defaultPos.y: height above the head bone. The blowgun uses 0.33 (mouth). Bigger = higher on screen.");
         poseForward = Config.Bind("HoldPose", "Forward", 1.45f, "Item.defaultPos.z: how far in front of the head the gun is held (vanilla items use 1). Smaller = closer to the camera.");
         poseLeftHandLeft = Config.Bind("HoldPose", "LeftHandLeft", 0.09f, "Metres the left hand sits left of the pump centre. Negative = right.");
         poseRightWristTilt = Config.Bind("HoldPose", "RightWristTiltDegrees", 30f, "Degrees the right hand's fingers tip up on the grip. Bigger = right elbow lower. 0 = the vanilla RopeShooter grip.");
-        poseToeIn = Config.Bind("HoldPose", "ToeInDegrees", 5f, "Degrees the barrel turns left toward the crosshair. Makes the gun show its side in first person instead of pointing straight away. 0 = parallel to the aim.");
+        poseToeIn = Config.Bind("HoldPose", "ToeInDegrees", 2f, "Degrees the barrel turns left toward the crosshair. Smaller = barrel turns right. 0 = parallel to the aim.");
         poseMuzzleUp = Config.Bind("HoldPose", "MuzzleUpDegrees", 2f, "Degrees the muzzle tips up toward the crosshair. Negative = muzzle down.");
         // Extra euler applied on top of the barrel→forward / top→up base alignment. Leave at 0 unless tuning.
         ModelRotX = Config.Bind("Model", "RotX", 0f, "Extra held local X euler on top of barrel-forward alignment.").Value;
