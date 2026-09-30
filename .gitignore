@@ -240,7 +240,9 @@ Thumbs.db
 
 .gamelibs/
 .gamelibs-nupkg/
+.gamelibs-unpack/
 peakgamelibs.nupkg
+peak-ci-gamelibs.zip
 
 # Rider
 .idea/
