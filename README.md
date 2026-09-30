@@ -1,5 +1,11 @@
 # peak-shotgun
 
+![Shotgun preview](media/preview1.jpg)
+
+![Shotgun preview](media/preview2.jpg)
+
+![Shotgun preview](media/preview3.jpg)
+
 Turns PEAK's leftover blowgun into a shotgun.
 
 A blast throws eight pellets in a short cone, about every 0.85 seconds. Scouts who are hit take a heavy Injury and get flipped. Zombies ignore Injury. The first hit flips them and adds Drowsy. The second hit knocks them out, and they stay down until PEAK kills them. See the [zombie page](https://peak.wiki.gg/wiki/Zombie).
@@ -29,7 +35,7 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 Requires [PEAK](https://store.steampowered.com/app/3527290/PEAK/) installed (auto-detected under common Steam paths), or set `PEAK_GAME_DIR` / `-p:PeakGameRootDir=`.
 
 ```bash
-dotnet build peak-shotgun.slnx -c Release
+dotnet build Peak.Shotgun.slnx -c Release
 ```
 
 Optional deploy: `-p:DeployToPeak=true -p:PeakPluginsDir="/path/to/BepInEx/plugins/PeakShotgun"`  
@@ -54,7 +60,7 @@ Every push still builds that zip. Thunderstore publish runs only when `<Version>
 
 ```bash
 ./build.sh
-# or: dotnet build peak-shotgun.slnx -c Release -target:PackTS
+# or: dotnet build Peak.Shotgun.slnx -c Release -target:PackTS
 # zip lands in artifacts/thunderstore/
 ```
 

@@ -33,6 +33,10 @@ target = "/"
 source = "../../LICENSE"
 target = "/"
 
+[[build.copy]]
+source = "../../media/"
+target = "/media/"
+
 [publish]
 communities = [ "peak", ]
 
