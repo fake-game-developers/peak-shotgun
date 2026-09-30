@@ -83,17 +83,16 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
     private static readonly Quaternion BackpackRotation = Quaternion.LookRotation(Vector3.forward, Vector3.right);
 
     /// <summary>
-    /// One line per equip, in camera space (+X right, +Y up, +Z forward), so the [HoldPose] values can be
-    /// judged against where the camera and the scout's real hands are. Runs a second later so the hold settles.
+    /// One line per equip, so the [HoldPose] values can be judged against where the scout's real hands are.
+    /// Local holder: camera space. Remote holder: that scout's look space at its head bone. Both +X right, +Y up,
+    /// +Z forward. Runs a second later so the hold settles.
     /// </summary>
     private void LogHeldGeometry()
     {
-        if (item?.holderCharacter == null || !item.holderCharacter.IsLocal)
+        if (item?.holderCharacter != null)
         {
-            return;
+            Invoke(nameof(WriteHeldGeometry), 1f);
         }
-
-        Invoke(nameof(WriteHeldGeometry), 1f);
     }
 
     private void WriteHeldGeometry()
@@ -105,11 +104,11 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
             return;
         }
 
-        Transform c = cam.transform;
+        Transform c = holder.IsLocal ? cam.transform : holder.refs.animationLookTransform;
         Vector3 Cam(Vector3 world) => c.InverseTransformPoint(world);
         Transform head = holder.GetBodypart(BodypartType.Head).transform;
         Plugin.Log.LogInfo(
-            $"Held shotgun (camera space): item={Cam(item.transform.position)}, target={Cam(holder.refs.items.GetItemHoldPos(item))}, "
+            $"Held shotgun ({(holder.IsLocal ? "camera space" : $"remote {holder.characterName}, look space")}): item={Cam(item.transform.position)}, target={Cam(holder.refs.items.GetItemHoldPos(item))}, "
             + $"anchorR={Cam(item.transform.Find("Hand_R").position)}, anchorL={Cam(item.transform.Find("Hand_L").position)}, "
             + $"handR={Cam(holder.GetBodypart(BodypartType.Hand_R).transform.position)}, handL={Cam(holder.GetBodypart(BodypartType.Hand_L).transform.position)}, "
             + $"shoulderR={Cam(holder.GetBodypart(BodypartType.Arm_R).transform.position)}, headBone={Cam(head.position)}, "
