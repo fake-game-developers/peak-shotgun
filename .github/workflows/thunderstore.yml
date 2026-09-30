@@ -69,45 +69,28 @@ jobs:
 
       - name: Decide whether to publish
         id: publish
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
           csproj=src/PeakShotgun/Peak.Shotgun.csproj
           version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$csproj")
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-          if [ "$EVENT_NAME" = "push" ]; then
-            before="$BEFORE"
+          # Publish when the csproj version is not yet the live Thunderstore release.
+          # Comparing only to the previous git commit misses bumps made while CI was red.
+          live=$(curl -fsSL -A "peak-shotgun" "https://thunderstore.io/api/experimental/package/FakeGameDevelopers/PeakShotgun/" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["latest"]["version_number"])' \
+            || true)
+          echo "Live Thunderstore version: ${live:-<none>}"
+
+          if [ -n "$live" ] && [ "$version" = "$live" ]; then
+            echo "Version $version is already the live Thunderstore release."
+            publish=false
           else
-            before=$(git rev-parse HEAD^)
+            publish=true
           fi
 
-          changed=false
-          if [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${before}^{commit}" 2>/dev/null; then
-            old=$(git show "${before}:$csproj" | sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p')
-            echo "Previous version: ${old:-<missing>}"
-            if [ "$version" != "$old" ]; then
-              changed=true
-            fi
-          else
-            echo "No previous commit to compare; treating the version as changed."
-            changed=true
-          fi
-
-          if [ "$changed" = true ]; then
-            live=$(curl -fsSL -A "peak-shotgun" "https://thunderstore.io/api/experimental/package/FakeGameDevelopers/PeakShotgun/" \
-              | python3 -c 'import json,sys; print(json.load(sys.stdin)["latest"]["version_number"])' \
-              || true)
-            if [ -n "$live" ] && [ "$version" = "$live" ]; then
-              echo "Version $version is already the live Thunderstore release."
-              changed=false
-            fi
-          fi
-
-          echo "Version $version; publish=$changed"
-          echo "publish=$changed" >> "$GITHUB_OUTPUT"
+          echo "Version $version; publish=$publish"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
 
       - name: Reuse Thunderstore categories
         if: steps.publish.outputs.publish == 'true'
