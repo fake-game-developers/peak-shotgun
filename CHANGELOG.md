@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- Fix ammo resetting to full when a shotgun is dropped or given to another player
+- Remaining shots stay in sync for everyone in the lobby, including late joiners
+- Magazine size and remaining shots are host-authoritative (clients use the host's `Shots` value)
+
 ## 1.0.3
 
 - Changing `Shots` in the config now applies on a new map without quitting PEAK

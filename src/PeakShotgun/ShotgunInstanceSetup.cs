@@ -1,5 +1,8 @@
+using System.Collections;
 using System.Collections.Generic;
+using Photon.Pun;
 using UnityEngine;
+using Zorro.Core;
 
 namespace Peak.Shotgun;
 
@@ -12,8 +15,6 @@ internal sealed class ShotgunInstanceSetup : MonoBehaviour
     internal static readonly HashSet<ShotgunInstanceSetup> Active = new();
 
     internal Item? Item { get; private set; }
-
-    private bool appliedShotCount;
 
     private void Awake()
     {
@@ -35,6 +36,8 @@ internal sealed class ShotgunInstanceSetup : MonoBehaviour
             Item.mainRenderer = renderer;
             Item.addtlRenderers = System.Array.Empty<Renderer>();
             Item.rightHandOnly = false;
+            // Capacity from host-synced ShotCount only — never invent ItemUses on clients.
+            Item.totalUses = Plugin.ShotCount;
         }
 
         if (mesh != null)
@@ -62,41 +65,42 @@ internal sealed class ShotgunInstanceSetup : MonoBehaviour
         }
     }
 
-    private void Start() => TryApplyShotCount();
-
-    private void Update()
+    private void Start()
     {
-        // Networked items can get data a frame or two after Start; retry briefly.
-        if (!appliedShotCount)
+        if (Item != null)
         {
-            TryApplyShotCount();
+            Item.totalUses = Plugin.ShotCount;
+        }
+
+        // Host fills a brand-new magazine when instance data never arrived (loot / debug spawn).
+        // Drop/equip already apply networked ItemUses — leave those alone.
+        if (!PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient)
+        {
+            StartCoroutine(HostEnsureNewMagazine());
         }
     }
 
-    private void TryApplyShotCount()
+    private IEnumerator HostEnsureNewMagazine()
     {
-        if (appliedShotCount || Item == null)
+        // After Item.Start / SetItemInstanceDataRPC on the same spawn.
+        yield return null;
+        if (Item == null)
         {
-            return;
+            yield break;
         }
 
-        // Prefab / inactive template: never invent instance data on the shared object.
-        if (!gameObject.scene.IsValid() || !gameObject.activeInHierarchy)
+        Item.totalUses = Plugin.ShotCount;
+        if (Item.HasData(DataEntryKey.ItemUses))
         {
-            return;
+            OptionableIntItemData existing = Item.GetData<OptionableIntItemData>(DataEntryKey.ItemUses);
+            if (existing.HasData && existing.Value >= 0)
+            {
+                yield break;
+            }
         }
 
-        try
-        {
-            // New spawns always take the live Shots value (map restart after a .cfg edit).
-            Plugin.ApplyShotCountToItem(Item, forceFullMagazine: true);
-            appliedShotCount = true;
-            ShotgunAmmoUI.Refresh();
-        }
-        catch (System.Exception)
-        {
-            // Item instance data not ready yet; Update will retry.
-        }
+        Action_Ammo? ammo = GetComponent<Action_Ammo>();
+        ammo?.EnsureHostMagazine();
     }
 
     private void OnEnable() => Active.Add(this);

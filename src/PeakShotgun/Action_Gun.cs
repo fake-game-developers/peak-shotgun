@@ -42,10 +42,17 @@ public class Action_Gun : ItemAction
 
     private bool HasAmmo()
     {
+        // Do not GetData before the entry exists — that registers an empty OptionableInt with
+        // HasData=false, which used to be treated as infinite ammo.
+        if (!item.HasData(DataEntryKey.ItemUses))
+        {
+            return item.totalUses <= 0;
+        }
+
         OptionableIntItemData data = item.GetData<OptionableIntItemData>(DataEntryKey.ItemUses);
         if (!data.HasData)
         {
-            return true;
+            return item.totalUses <= 0;
         }
 
         return data.Value < 0 || data.Value > 0;
@@ -58,7 +65,8 @@ public class Action_Gun : ItemAction
             return;
         }
 
-        item.photonView.RPC(nameof(Action_Ammo.ReduceUsesRPC), RpcTarget.All);
+        // Host is authoritative for remaining ammo; clients only request a spend.
+        item.photonView.RPC(nameof(Action_Ammo.RequestSpendRPC), RpcTarget.MasterClient);
         OnShoot?.Invoke();
 
         Vector3 origin = spawnTransform.position;

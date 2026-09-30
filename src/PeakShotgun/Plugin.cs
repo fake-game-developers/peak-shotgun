@@ -28,8 +28,11 @@ public partial class Plugin : BaseUnityPlugin
 
     private static ConfigEntry<int>? shots;
 
-    /// <summary>Shots in each shotgun. Live from config; at least 1.</summary>
-    internal static int ShotCount => Mathf.Max(1, shots?.Value ?? 5);
+    /// <summary>Local <c>Shots</c> config (host publishes this; clients ignore it for ammo).</summary>
+    internal static int LocalConfiguredShots => Mathf.Max(1, shots?.Value ?? 5);
+
+    /// <summary>Magazine size in use: host-synced in multiplayer, otherwise local config.</summary>
+    internal static int ShotCount => HostShotSync.ShotCount;
 
     internal static float ModelScale { get; private set; } = 0.015f;
 
@@ -300,7 +303,7 @@ public partial class Plugin : BaseUnityPlugin
         Instance = this;
         Log = Logger;
         shots = Config.Bind("Shotgun", "Shots", 5, new ConfigDescription(
-            "Shots in each shotgun. Save the .cfg and start a new map (no need to quit PEAK).",
+            "Shots in each shotgun. Host's value is used in multiplayer. Save the .cfg and start a new map (no need to quit PEAK).",
             new AcceptableValueRange<int>(1, 999)));
         recoilEnabled = Config.Bind("Shotgun", "EnableRecoil", true, "Push the shooter back on each shot. Strength is Recoil.");
         recoil = Config.Bind("Shotgun", "Recoil", 5f, new ConfigDescription(
@@ -340,6 +343,7 @@ public partial class Plugin : BaseUnityPlugin
         LuggageLiftExtra = Config.Bind("Model", "LuggageFloorPad", 0.025f, "Extra padding above the luggage floor after snapping the mesh bottom onto the suitcase lining.").Value;
         new Harmony(Name ?? "PeakShotgun").PatchAll();
         gameObject.AddComponent<ShotgunCameraNearClip>();
+        gameObject.AddComponent<HostShotSync>();
         StartCoroutine(WaitForBlowgun());
         shoreSpawnRoutine = StartCoroutine(ShoreTestSpawns.WhenTheShoreIsReady());
         SceneManager.sceneLoaded += OnSceneLoaded;
@@ -396,7 +400,8 @@ public partial class Plugin : BaseUnityPlugin
             Config.Reload();
             PoseVersion++;
             ApplyLuggageSpawnConfig();
-            ApplyShotCountConfig();
+            // Host publishes Shots; clients keep the room value (ignore their own Shots for ammo).
+            HostShotSync.SyncFromLocalRole(reason);
             LogPose($"Config reloaded ({reason}); held pose now");
             Log.LogInfo($"Config reloaded ({reason}); shots per shotgun now {ShotCount}.");
         }
@@ -407,8 +412,9 @@ public partial class Plugin : BaseUnityPlugin
     }
 
     /// <summary>
-    /// Writes <see cref="ShotCount"/> onto the prefab and every live shotgun so a .cfg edit
-    /// (or map reload that spawns from that prefab) is not stuck on the Awake-time value.
+    /// Writes <see cref="ShotCount"/> onto the prefab and live guns' <see cref="Item.totalUses"/> only.
+    /// Remaining shots live in networked <c>ItemUses</c> — never rewrite that here (drop/equip
+    /// re-spawns the prefab and reapplies instance data; refilling would look like infinite ammo).
     /// </summary>
     internal static void ApplyShotCountConfig()
     {
@@ -418,51 +424,21 @@ public partial class Plugin : BaseUnityPlugin
             Item? prefabItem = ShotgunPrefab.GetComponent<Item>();
             if (prefabItem != null)
             {
-                // Prefab only: do not touch ItemUses (that is per-instance networked data).
                 prefabItem.totalUses = count;
             }
         }
 
         foreach (ShotgunInstanceSetup setup in ShotgunInstanceSetup.Active)
         {
-            if (setup == null || setup.Item == null)
+            if (setup?.Item == null)
             {
                 continue;
             }
 
-            // Live guns: only refill when the magazine was still full at the old size.
-            ApplyShotCountToItem(setup.Item, forceFullMagazine: false);
+            setup.Item.totalUses = count;
         }
 
         ShotgunAmmoUI.Refresh();
-    }
-
-    /// <summary>
-    /// Sets <see cref="Item.totalUses"/> from config.
-    /// <paramref name="forceFullMagazine"/> is for freshly spawned guns (always take the current Shots value).
-    /// Otherwise full magazines refill to the new count; partially spent guns keep remaining shots.
-    /// </summary>
-    internal static void ApplyShotCountToItem(Item item, bool forceFullMagazine)
-    {
-        int count = ShotCount;
-        OptionableIntItemData data = item.GetData<OptionableIntItemData>(DataEntryKey.ItemUses);
-        bool wasFull = !data.HasData || data.Value < 0 || data.Value >= item.totalUses;
-        item.totalUses = count;
-
-        if (forceFullMagazine || !data.HasData || data.Value < 0 || wasFull)
-        {
-            data.HasData = true;
-            data.Value = count;
-            item.SetUseRemainingPercentage(1f);
-            return;
-        }
-
-        if (data.Value > count)
-        {
-            data.Value = count;
-        }
-
-        item.SetUseRemainingPercentage(count > 0 ? data.Value / (float)count : 0f);
     }
 
     private Coroutine? shoreSpawnRoutine;
