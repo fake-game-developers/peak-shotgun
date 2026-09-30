@@ -41,7 +41,7 @@ dotnet build Peak.Shotgun.slnx -c Release
 Optional deploy: `-p:DeployToPeak=true -p:PeakPluginsDir="/path/to/BepInEx/plugins/PeakShotgun"`  
 Optional overrides: copy `Config.Build.user.props.example` → `Config.Build.user.props` (gitignored).
 
-The DLL is `artifacts/bin/PeakShotgun/release/PeakShotgun.dll`.
+The DLL is `artifacts/bin/Peak.Shotgun/release/PeakShotgun.dll`.
 
 ## Developers
 

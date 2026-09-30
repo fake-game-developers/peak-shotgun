@@ -17,7 +17,7 @@ The gun is not a new model. `Plugin.CreateFromBlowgun` waits for PEAK's item cat
 | `src/PeakShotgun/icons/Melon.png` | Unused earlier test icon. Not embedded |
 | `src/PeakShotgun/sounds/ShotgunBlast.wav` | Placeholder shot, Lethal Company's `ShotgunBlast`. Embedded. Replace this before publishing |
 | `src/PeakShotgun/thunderstore.toml` | Thunderstore listing. `icon.png` at the repo root is the store icon, not the in-game one |
-| `artifacts/bin/PeakShotgun/release/PeakShotgun.dll` | Release build |
+| `artifacts/bin/Peak.Shotgun/release/PeakShotgun.dll` | Release build |
 
 Embedded resource names are set in `Peak.Shotgun.csproj` and must match the `GetManifestResourceStream` strings in `Plugin.cs`:
 
