@@ -60,6 +60,12 @@ public partial class Plugin : BaseUnityPlugin
     /// <summary>How many random Roots luggage get a forced shotgun each run (anywhere on the Roots map).</summary>
     internal const int GuaranteedLuggageShotguns = 2;
 
+    /// <summary>
+    /// Hard cap: at most this many luggage in a single biome pool may contain a shotgun per run
+    /// (random rolls and Roots guarantees both count).
+    /// </summary>
+    internal const int MaxShotgunsPerBiome = 4;
+
     /// <summary>All PEAK luggage spawn pools (biome suitcases).</summary>
     internal static readonly SpawnPool AllLuggagePools =
         SpawnPool.LuggageBeach
@@ -634,8 +640,9 @@ public partial class Plugin : BaseUnityPlugin
         }
 
         loot.spawnLocations = ShotgunLuggagePools;
-        // Rare when Roots-only so forced picks dominate; Common when all biomes so other maps can roll it.
-        loot.Rarity = CanSpawnOnAnyBiome ? Rarity.Common : Rarity.Rare;
+        // Roots-only: Rare so the two forced suitcases dominate. All biomes: very rare rolls,
+        // still hard-capped at MaxShotgunsPerBiome (Common used to flood Mesa/canyon luggage).
+        loot.Rarity = CanSpawnOnAnyBiome ? Rarity.RidiculouslyRare : Rarity.Rare;
         LootData.AllSpawnWeightData = null;
         RootsLuggagePatch.ResetGuarantees();
     }

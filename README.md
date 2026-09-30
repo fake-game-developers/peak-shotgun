@@ -22,7 +22,8 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 
 - **Roots:** every run, **at least two random luggage** anywhere on the Roots map are forced to contain a shotgun. This always happens; no config turns it off.
 - **Other biomes:** by default the shotgun does **not** appear in luggage outside Roots.
-- Set `CanSpawnOnAnyBiome = true` under `[Shotgun]` in `BepInEx/config/PeakShotgun.cfg` to also allow random shotgun rolls in luggage on any biome. Roots still forces two suitcases either way.
+- Set `CanSpawnOnAnyBiome = true` under `[Shotgun]` in `BepInEx/config/PeakShotgun.cfg` to also allow very rare random shotgun rolls in other biomes. Roots still forces two suitcases either way.
+- **Cap:** at most **4** luggage per biome can contain a shotgun in a single run (including Roots).
 
 It looks like the blowgun, because that is the model PEAK ships. It does not replace the blowgun.
 

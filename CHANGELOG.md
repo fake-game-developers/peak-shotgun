@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5
+
+- Make luggage shotgun spawns much rarer when allowed outside Roots (`RidiculouslyRare` instead of `Common`)
+- Cap shotgun luggage at 4 per biome per run
+
 ## 1.0.4
 
 - Fix ammo resetting to full when a shotgun is dropped or given to another player
