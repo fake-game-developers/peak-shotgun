@@ -22,19 +22,14 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Download stripped PEAK Managed refs (CI)
+      - name: Download FakeGameDevelopers.PEAKGameLibs (CI refs)
         run: |
           set -euo pipefail
           mkdir -p .gamelibs
-          # Hosted as a repo release asset (stripped+publicized). Not committed to git.
-          curl -fsSL "https://github.com/fake-game-developers/peak-shotgun/releases/download/ci-refs/peak-ci-gamelibs.zip" -o peak-ci-gamelibs.zip
-          unzip -q peak-ci-gamelibs.zip -d .gamelibs-unpack
-          # Zip may contain files at root or under ci-gamelibs/
-          if [ -d .gamelibs-unpack/ci-gamelibs ]; then
-            cp -r .gamelibs-unpack/ci-gamelibs/. .gamelibs/
-          else
-            cp -r .gamelibs-unpack/. .gamelibs/
-          fi
+          # Public fork with stripped+publicized PEAK 2.5.a Managed refs.
+          curl -fsSL "https://github.com/fake-game-developers/PEAKGameLibs/archive/refs/heads/main.tar.gz" -o peakgamelibs.tar.gz
+          tar -xzf peakgamelibs.tar.gz
+          cp -r PEAKGameLibs-main/package/lib/. .gamelibs/
           test -f .gamelibs/Assembly-CSharp.dll
           echo "ManagedDir=$PWD/.gamelibs"
 
