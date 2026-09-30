@@ -1,11 +1,11 @@
 # Embedded game assets
 
-Only these files are referenced from `PeakShotgun.csproj`:
+Only these files are referenced from `Peak.Shotgun.csproj`:
 
 | File | Role |
 |------|------|
 | `shotgun.obj` | Custom mesh (Wavefront, with UVs) |
-| `shotgun_albedo_1k.png` | Base color embedded as `PeakShotgun.models.shotgun_albedo.png` |
+| `shotgun_albedo_1k.png` | Base color embedded as `Peak.Shotgun.models.shotgun_albedo.png` |
 
 Regenerate both from the FBX under `src-mesh/`:
 

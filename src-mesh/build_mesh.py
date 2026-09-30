@@ -91,7 +91,7 @@ def prepare_meshset(fbx: Path, target_faces: int) -> pymeshlab.MeshSet:
 
 
 def preview_loader_bounds(ms: pymeshlab.MeshSet) -> None:
-    """Same center + max-extent normalize as PeakShotgun.ObjMeshLoader."""
+    """Same center + max-extent normalize as Peak.Shotgun.ObjMeshLoader."""
     vs = ms.current_mesh().vertex_matrix().astype(np.float64)
     center = vs.mean(axis=0)
     v = vs - center

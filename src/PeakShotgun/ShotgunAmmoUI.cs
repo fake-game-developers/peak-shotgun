@@ -1,7 +1,7 @@
 using HarmonyLib;
 using Zorro.Core;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 internal static class ShotgunAmmoUI
 {

@@ -1,12 +1,13 @@
 using HarmonyLib;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 /// <summary>
 /// PEAK centers luggage items on mainRenderer.bounds, then applies offsetLuggagePosition.
 /// After OffsetSpawn: pin the visual flat on the suitcase floor, then seat using the real mesh
 /// vertices (not renderer.bounds — that AABB-of-AABB sits below the gun after the flat-lay yaw).
+/// Do not raycast the luggage collider: open suitcases use a shell that sits the gun on the rim.
 /// </summary>
 [HarmonyPatch(typeof(Luggage), nameof(Luggage.OffsetSpawn))]
 internal static class LuggageShotgunOffsetPatch
@@ -33,6 +34,7 @@ internal static class LuggageShotgunOffsetPatch
         Vector3 up = __instance.transform.up;
 
         // Spawn spot / floor plane from PEAK's placement (Center on spot, then offset lift).
+        // Capture before undoing the lift — that plane is the cavity floor, not the collider lid.
         Renderer? renderer = item.mainRenderer;
         Vector3 spawnSpot = renderer != null
             ? renderer.bounds.center - __instance.transform.rotation * item.offsetLuggagePosition
@@ -77,7 +79,7 @@ internal static class LuggageShotgunOffsetPatch
         item.GetComponent<ShotgunPhysics>()?.Apply();
         item.ForceSyncForFrames();
         Plugin.Log.LogInfo(
-            $"Luggage seat yaw={Plugin.LuggageYaw:0.#}° Δ={delta:0.###} (vertex snap, liftExtra={Plugin.LuggageLiftExtra:0.###}).");
+            $"Luggage seat yaw={Plugin.LuggageYaw:0.#}° Δ={delta:0.###} (spawn-spot, liftExtra={Plugin.LuggageLiftExtra:0.###}).");
     }
 
     private static float MinMeshAlongUp(Transform visual, Mesh mesh, Vector3 up)

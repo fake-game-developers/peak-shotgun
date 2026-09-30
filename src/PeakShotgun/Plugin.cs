@@ -13,7 +13,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Zorro.Core;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 [BepInAutoPlugin]
 [BepInDependency(ItemsPlugin.Id)]
@@ -29,30 +29,82 @@ public partial class Plugin : BaseUnityPlugin
     internal static int ShotCount { get; private set; } = 5;
 
     internal static float ModelScale { get; private set; } = 0.015f;
-    internal static float ModelPosX { get; private set; }
+
+    private static ConfigEntry<bool>? recoilEnabled;
+
+    private static ConfigEntry<float>? recoil;
+
+    /// <summary>m/s the shooter is pushed back along the aim per shot, 0-10. 0 when disabled. Live.</summary>
+    internal static float Recoil => (recoilEnabled?.Value ?? true) ? recoil?.Value ?? 5f : 0f;
+
+    private static ConfigEntry<bool>? debugMode;
+
+    /// <summary>Host spawns test zombies, shotguns and luggage near the player on Airport / Shore.</summary>
+    internal static bool DebugMode => debugMode?.Value ?? false;
+
+    private static ConfigEntry<bool>? canSpawnOnAnyBiome;
+
+    /// <summary>
+    /// When false (default), luggage loot is Roots-only.
+    /// When true, the shotgun can also roll in luggage on any biome.
+    /// Roots always gets <see cref="GuaranteedLuggageShotguns"/> random forced suitcases, regardless of this flag.
+    /// </summary>
+    internal static bool CanSpawnOnAnyBiome => canSpawnOnAnyBiome?.Value ?? false;
+
+    /// <summary>How many random Roots luggage get a forced shotgun each run (anywhere on the Roots map).</summary>
+    internal const int GuaranteedLuggageShotguns = 2;
+
+    /// <summary>All PEAK luggage spawn pools (biome suitcases).</summary>
+    internal static readonly SpawnPool AllLuggagePools =
+        SpawnPool.LuggageBeach
+        | SpawnPool.LuggageJungle
+        | SpawnPool.LuggageTundra
+        | SpawnPool.LuggageCaldera
+        | SpawnPool.LuggageClimber
+        | SpawnPool.LuggageAncient
+        | SpawnPool.LuggageCursed
+        | SpawnPool.LuggageMesa
+        | SpawnPool.LuggageRoots
+        | SpawnPool.LuggageGloom
+        | SpawnPool.LuggageCitadel
+        | SpawnPool.LuggageClown;
+
+    internal static SpawnPool ShotgunLuggagePools =>
+        CanSpawnOnAnyBiome ? AllLuggagePools : SpawnPool.LuggageRoots;
 
     // Held pose. These read the config entries live (not cached at startup), and Update() re-reads the
     // .cfg file when it changes, so the pose can be tuned while the game is running.
-    private static ConfigEntry<float>? poseScreenRight;
-    private static ConfigEntry<float>? poseDown;
+    private static ConfigEntry<float>? poseRight;
+    private static ConfigEntry<float>? poseUp;
     private static ConfigEntry<float>? poseForward;
+    private static ConfigEntry<float>? poseLeftHandLeft;
+
+    /// <summary>Metres the left hand sits left of the pump centre (item -X, turned with the aim).</summary>
+    internal static float LeftHandLeft => poseLeftHandLeft?.Value ?? 0.09f;
+
+    private static ConfigEntry<float>? poseRightWristTilt;
+
+    /// <summary>Degrees the right hand's fingers tip up (about item +X) so the forearm comes from below and the elbow drops.</summary>
+    internal static float RightWristTilt => poseRightWristTilt?.Value ?? 30f;
+
     private static ConfigEntry<float>? poseToeIn;
     private static ConfigEntry<float>? poseMuzzleUp;
 
-    /// <summary>Moves the held gun and both hand anchors toward the scout's right (item +X).</summary>
-    internal static float HeldOffsetRight => poseScreenRight?.Value ?? 0.79f;
+    /// <summary>
+    /// PEAK's <c>Item.defaultPos</c>: where the item root (and so the grip and both hands) is held, in the
+    /// scout's look space (+X right, +Y up, +Z forward) from the head bone. The camera sits about 1 up from
+    /// that bone (<c>Character.GetCameraPos</c>). The blowgun we clone uses (0, 0.33, 1): centred at the mouth.
+    /// </summary>
+    internal static Vector3 HeldDefaultPos => new(
+        poseRight?.Value ?? 0.5f,
+        poseUp?.Value ?? -0.4f,
+        poseForward?.Value ?? 1.15f);
 
-    /// <summary>Moves the held gun AND both hand anchors down (item -Y). Negative = up.</summary>
-    internal static float HeldOffsetDown => poseDown?.Value ?? 0.36f;
+    /// <summary>Degrees the barrel turns left toward the crosshair. Negative turns it right.</summary>
+    internal static float HeldToeIn => poseToeIn?.Value ?? -6f;
 
-    /// <summary>Extra push forward (item +Z) on top of Model.PosZ. Negative = toward the body.</summary>
-    internal static float HeldOffsetForward => poseForward?.Value ?? 0f;
-
-    /// <summary>Degrees the barrel turns toward the crosshair (left, since the gun sits on the right).</summary>
-    internal static float HeldToeIn => poseToeIn?.Value ?? 5f;
-
-    /// <summary>Degrees the muzzle tips up. FPS guns sit below the crosshair and angle slightly up to it.</summary>
-    internal static float HeldMuzzleUp => poseMuzzleUp?.Value ?? 2f;
+    /// <summary>Degrees the gun pitches about the grip: muzzle up, stock down. 0 = level with the aim.</summary>
+    internal static float HeldMuzzleUp => poseMuzzleUp?.Value ?? 8f;
 
     /// <summary>Bumped whenever the .cfg file changes on disk so held guns re-place their hand anchors.</summary>
     internal static int PoseVersion { get; private set; }
@@ -60,8 +112,6 @@ public partial class Plugin : BaseUnityPlugin
     private DateTime lastConfigWriteUtc;
     private float nextConfigCheck;
 
-    internal static float ModelPosY { get; private set; }
-    internal static float ModelPosZ { get; private set; }
     internal static float ModelRotX { get; private set; }
     internal static float ModelRotY { get; private set; }
     internal static float ModelRotZ { get; private set; }
@@ -91,15 +141,17 @@ public partial class Plugin : BaseUnityPlugin
     internal static readonly Quaternion HeldBaseRotation =
         Quaternion.Inverse(Quaternion.LookRotation(Vector3.left, Vector3.forward));
 
-    internal static Quaternion HeldLocalRotation =>
-        Quaternion.Euler(ModelRotX - HeldMuzzleUp, ModelRotY - HeldToeIn, ModelRotZ) * HeldBaseRotation;
+    /// <summary>Toe-in / muzzle-up (plus Model.Rot*) in item space. The gun and both hand anchors turn by this.</summary>
+    internal static Quaternion HeldAim =>
+        Quaternion.Euler(ModelRotX - HeldMuzzleUp, ModelRotY - HeldToeIn, ModelRotZ);
+
+    internal static Quaternion HeldLocalRotation => HeldAim * HeldBaseRotation;
 
     /// <summary>
-    /// Grip at the item origin (where PEAK puts the hands), plus a small Pos* fine-tune.
-    /// Without the grip pivot, the centered mesh puts the camera inside the receiver in FP.
+    /// Grip at the item origin. PEAK holds the item origin at <see cref="HeldDefaultPos"/>, so the
+    /// right hand (Hand_R at the origin) stays within arm's reach wherever the gun is placed on screen.
     /// </summary>
-    internal static Vector3 HeldLocalPosition =>
-        new Vector3(ModelPosX + HeldOffsetRight, ModelPosY - HeldOffsetDown, ModelPosZ + HeldOffsetForward) - HeldLocalRotation * (GripMeshPoint * ModelScale);
+    internal static Vector3 HeldLocalPosition => -(HeldLocalRotation * (GripMeshPoint * ModelScale));
 
     internal static Vector3 RestLocalPosition => new(RestPosX, RestPosY + RestMeshLift, RestPosZ);
 
@@ -113,21 +165,48 @@ public partial class Plugin : BaseUnityPlugin
     {
         Bounds b = mesh.bounds;
         // OBJ loader flips X: source stock (was -X) lands on max.x, muzzle on min.x.
-        // Gripping min.x put the pivot on the muzzle so the barrel ran back through the scout
-        // (looked like "points at my head" / turn left → gun swings right).
-        GripMeshPoint = new Vector3(
-            Mathf.Lerp(b.min.x, b.max.x, 0.82f),
-            b.center.y,
-            Mathf.Lerp(b.min.z, b.max.z, 0.35f));
-        ForendMeshPoint = new Vector3(
-            Mathf.Lerp(b.min.x, b.max.x, 0.38f),
-            b.center.y - b.extents.y * 0.15f,
-            Mathf.Lerp(b.min.z, b.max.z, 0.35f));
-        MuzzleMeshPoint = new Vector3(b.min.x, b.center.y, b.center.z);
+        // The mesh is not axis-aligned (the stock drops and drifts sideways), so whole-mesh bounds put the
+        // hands beside and below the gun. Centre each hand on the cross-section of the part it holds instead.
+        // Slices are fractions from muzzle (0) to butt (1): the stock wrist sits just behind the trigger guard,
+        // the pump is the ribbed block under the barrel ahead of the receiver.
+        Vector3[] vertices = mesh.vertices;
+        Bounds wrist = SliceBounds(vertices, b, 0.64f, 0.72f);
+        Bounds pump = SliceBounds(vertices, b, 0.18f, 0.30f);
+        GripMeshPoint = wrist.center;
+        // Palm under the pump: hand bone at the pump's underside.
+        ForendMeshPoint = new Vector3(pump.center.x, pump.center.y, pump.min.z);
+        // Barrel end: centre of the tip slice. Whole-mesh bounds put it 15 cm low and 7 cm to the side.
+        Bounds tip = SliceBounds(vertices, b, 0f, 0.02f);
+        MuzzleMeshPoint = new Vector3(b.min.x, tip.center.y, tip.center.z);
 
         RestMeshLift = -MinRestYInItemSpace(mesh.vertices, new Vector3(RestPosX, RestPosY, RestPosZ));
         Log?.LogInfo(
             $"Mesh anchors: grip={GripMeshPoint}, forend={ForendMeshPoint}, muzzle={MuzzleMeshPoint}, restLift={RestMeshLift:0.###}.");
+    }
+
+    private static Bounds SliceBounds(Vector3[] vertices, Bounds whole, float t0, float t1)
+    {
+        float x0 = Mathf.Lerp(whole.min.x, whole.max.x, t0);
+        float x1 = Mathf.Lerp(whole.min.x, whole.max.x, t1);
+        Vector3 min = Vector3.positiveInfinity;
+        Vector3 max = Vector3.negativeInfinity;
+        foreach (Vector3 v in vertices)
+        {
+            if (v.x >= x0 && v.x <= x1)
+            {
+                min = Vector3.Min(min, v);
+                max = Vector3.Max(max, v);
+            }
+        }
+
+        if (min.x > max.x)
+        {
+            return new Bounds(new Vector3((x0 + x1) * 0.5f, whole.center.y, whole.center.z), Vector3.zero);
+        }
+
+        var slice = new Bounds();
+        slice.SetMinMax(min, max);
+        return slice;
     }
 
     /// <summary>
@@ -218,19 +297,27 @@ public partial class Plugin : BaseUnityPlugin
         Instance = this;
         Log = Logger;
         ShotCount = Mathf.Max(1, Config.Bind("Shotgun", "Shots", 5, "Shots in each shotgun.").Value);
+        recoilEnabled = Config.Bind("Shotgun", "EnableRecoil", true, "Push the shooter back on each shot. Strength is Recoil.");
+        recoil = Config.Bind("Shotgun", "Recoil", 5f, new ConfigDescription(
+            "Metres per second the shooter is pushed back, opposite the aim, on each shot. Used when EnableRecoil is true.",
+            new AcceptableValueRange<float>(0f, 10f)));
+        canSpawnOnAnyBiome = Config.Bind(
+            "Shotgun",
+            "CanSpawnOnAnyBiome",
+            false,
+            "If false (default), shotguns only appear in Roots luggage. If true, they can also roll in luggage in other biomes. Roots always forces two random suitcases to contain a shotgun either way.");
+        debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
-        ModelPosX = Config.Bind("Model", "PosX", 0f, "Extra held X offset after grip-pivot (usually 0).").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
-        // would ignore a changed default. Older [Model] HeldSideOffset / HeldOffsetRight / HeldOffsetDown
-        // and [HeldPose] entries in the .cfg are simply unused now.
+        // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.
         // These are live: edit and save the .cfg while the game runs and the pose updates within a second.
-        poseScreenRight = Config.Bind("Pose", "ScreenRight", 0.79f, "Metres to move the held shotgun and both hands to the scout's right.");
-        poseDown = Config.Bind("Pose", "Down", 0.36f, "Metres to move the gun AND both hands down. Bigger = lower. Negative = higher.");
-        poseForward = Config.Bind("Pose", "Forward", 0f, "Metres to push the gun AND both hands forward (on top of Model.PosZ). Negative = closer to the body.");
-        poseToeIn = Config.Bind("Pose", "ToeInDegrees", 5f, "Degrees the barrel turns left toward the crosshair. Makes the gun show its side in first person instead of pointing straight away. 0 = parallel to the aim.");
-        poseMuzzleUp = Config.Bind("Pose", "MuzzleUpDegrees", 2f, "Degrees the muzzle tips up toward the crosshair. Negative = muzzle down.");
-        ModelPosY = Config.Bind("Model", "PosY", -0.04f, "Extra held Y offset after grip-pivot (negative lowers the gun in FP).").Value;
-        ModelPosZ = Config.Bind("Model", "PosZ", 0.18f, "Extra held Z offset after grip-pivot (push forward away from camera).").Value;
+        poseRight = Config.Bind("HoldPose", "Right", 0.5f, "Item.defaultPos.x: how far right of the head the gun and both hands are held. 0 = centred.");
+        poseUp = Config.Bind("HoldPose", "Up", -0.4f, "Item.defaultPos.y: height relative to the head bone. The blowgun uses 0.33 (mouth). Bigger = higher on screen.");
+        poseForward = Config.Bind("HoldPose", "Forward", 1.15f, "Item.defaultPos.z: metres in front of the head the gun is pulled toward (vanilla items use 1). The arms stop it at their reach, so past that it mostly changes how hard it is pulled.");
+        poseLeftHandLeft = Config.Bind("HoldPose", "LeftHandLeft", 0.09f, "Metres the left hand sits left of the pump centre. Negative = right.");
+        poseRightWristTilt = Config.Bind("HoldPose", "RightWristTiltDegrees", 30f, "Degrees the right hand's fingers tip up on the grip. Bigger = right elbow lower. 0 = the vanilla RopeShooter grip.");
+        poseToeIn = Config.Bind("HoldPose", "ToeInDegrees", -6f, "Degrees the barrel turns left toward the crosshair. Negative = barrel turns right. 0 = parallel to the aim.");
+        poseMuzzleUp = Config.Bind("HoldPose", "MuzzleUpDegrees", 8f, "Degrees the gun pitches about the grip: muzzle up and stock down. 0 = level with the aim. Negative = stock up.");
         // Extra euler applied on top of the barrel→forward / top→up base alignment. Leave at 0 unless tuning.
         ModelRotX = Config.Bind("Model", "RotX", 0f, "Extra held local X euler on top of barrel-forward alignment.").Value;
         ModelRotY = Config.Bind("Model", "RotY", 0f, "Extra held local Y euler on top of barrel-forward alignment.").Value;
@@ -245,7 +332,7 @@ public partial class Plugin : BaseUnityPlugin
         RestRotZ = Config.Bind("Model", "RestRotZ", 0f, "Rest (luggage/ground) local Z euler rotation of the custom mesh.").Value;
         // Luggage-only flat diagonal: yaw around the suitcase floor normal on the visual (not the item root).
         LuggageYaw = Config.Bind("Model", "LuggageYaw", 45f, "Luggage-only yaw around the suitcase floor normal (degrees). Flip sign if diagonal goes the wrong way.").Value;
-        LuggageLiftExtra = Config.Bind("Model", "LuggageLiftExtra", 0.01f, "Extra padding above the luggage floor after snapping the mesh bottom onto the spawn plane.").Value;
+        LuggageLiftExtra = Config.Bind("Model", "LuggageFloorPad", 0.025f, "Extra padding above the luggage floor after snapping the mesh bottom onto the suitcase lining.").Value;
         new Harmony(Name ?? "PeakShotgun").PatchAll();
         gameObject.AddComponent<ShotgunCameraNearClip>();
         StartCoroutine(WaitForBlowgun());
@@ -269,10 +356,7 @@ public partial class Plugin : BaseUnityPlugin
     }
 
     private static void LogPose(string prefix) =>
-        Log.LogInfo(
-            $"{prefix}: screenRight={HeldOffsetRight:0.###}, down={HeldOffsetDown:0.###}, forward={HeldOffsetForward:0.###}, "
-            + $"toeIn={HeldToeIn:0.#}°, muzzleUp={HeldMuzzleUp:0.#}° "
-            + $"(Model.PosY={ModelPosY:0.###}, PosZ={ModelPosZ:0.###}).");
+        Log.LogInfo($"{prefix}: defaultPos={HeldDefaultPos}, toeIn={HeldToeIn:0.#}°, muzzleUp={HeldMuzzleUp:0.#}°.");
 
     /// <summary>
     /// Live tuning: when the .cfg file changes on disk, reload it and tell held guns to re-place their
@@ -297,6 +381,7 @@ public partial class Plugin : BaseUnityPlugin
         {
             Config.Reload();
             PoseVersion++;
+            ApplyLuggageSpawnConfig();
             LogPose("Config reloaded; held pose now");
         }
         catch (Exception e)
@@ -315,6 +400,7 @@ public partial class Plugin : BaseUnityPlugin
         }
 
         shoreSpawnRoutine = StartCoroutine(ShoreTestSpawns.WhenTheShoreIsReady());
+        RootsLuggagePatch.ResetGuarantees();
     }
 
     private IEnumerator WaitForBlowgun()
@@ -412,7 +498,7 @@ public partial class Plugin : BaseUnityPlugin
             DestroyImmediate(particles);
         }
 
-        Transform? customMuzzle = ShotgunModelSwap.Apply(gunObject, database, blowgun);
+        Transform? customMuzzle = ShotgunModelSwap.Apply(gunObject, database);
         if (customMuzzle != null)
         {
             spawn = customMuzzle;
@@ -463,22 +549,45 @@ public partial class Plugin : BaseUnityPlugin
         ];
         gunObject.AddComponent<Action_Ammo>();
 
-        // Every Shore and Roots luggage includes one shotgun. Shore is for testing.
+        // Zombie-maps-only (default): Roots pool + Rare (first 1–2 Roots rolls are forced).
+        // Off: every luggage biome, Common roll, no force.
         LootData loot = gunObject.GetComponent<LootData>() ?? gunObject.AddComponent<LootData>();
-        loot.Rarity = Rarity.Common;
-        loot.spawnLocations = SpawnPool.LuggageBeach | SpawnPool.LuggageRoots;
         loot.banInSolo = false;
         loot.rarityOverrides.Clear();
+        ApplyLuggageSpawnConfig(loot);
         LootData.AllSpawnWeightData = null;
 
         new ItemContent(item).Register(ModDefinition.GetOrCreate(Info));
         ShotgunPrefab = gunObject;
-        Log.LogInfo("Registered the shotgun in every Shore and Roots luggage.");
+        Log.LogInfo(
+            CanSpawnOnAnyBiome
+                ? $"Registered the shotgun for all biomes' luggage ({GuaranteedLuggageShotguns} random Roots suitcases always forced)."
+                : $"Registered the shotgun for Roots luggage only ({GuaranteedLuggageShotguns} random suitcases always forced).");
+    }
+
+    /// <summary>Applies <see cref="CanSpawnOnAnyBiome"/> to the prefab loot table (startup + live config reload).</summary>
+    internal static void ApplyLuggageSpawnConfig(LootData? loot = null)
+    {
+        if (loot == null && ShotgunPrefab != null)
+        {
+            loot = ShotgunPrefab.GetComponent<LootData>();
+        }
+
+        if (loot == null)
+        {
+            return;
+        }
+
+        loot.spawnLocations = ShotgunLuggagePools;
+        // Rare when Roots-only so forced picks dominate; Common when all biomes so other maps can roll it.
+        loot.Rarity = CanSpawnOnAnyBiome ? Rarity.Common : Rarity.Rare;
+        LootData.AllSpawnWeightData = null;
+        RootsLuggagePatch.ResetGuarantees();
     }
 
     private static void ApplyIcon(Item item)
     {
-        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("PeakShotgun.icons.ShotgunIcon.png");
+        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Peak.Shotgun.icons.ShotgunIcon.png");
         if (stream == null)
         {
             Log.LogWarning("Shotgun icon resource was not found.");
@@ -501,10 +610,10 @@ public partial class Plugin : BaseUnityPlugin
 
     private static SFX_Instance? PlaceholderShot()
     {
-        AudioClip? clip = LoadWav("PeakShotgun.sounds.ShotgunBlast.wav");
+        AudioClip? clip = LoadWav("Peak.Shotgun.sounds.shotgun_fire_01.wav");
         if (clip == null)
         {
-            Log.LogWarning("Placeholder shotgun shot was not found. Using the blowgun sound.");
+            Log.LogWarning("Shotgun fire sound was not found. Using the blowgun sound.");
             return null;
         }
 
@@ -568,7 +677,7 @@ public partial class Plugin : BaseUnityPlugin
 
         if (channels <= 0 || sampleRate <= 0 || bits != 16 || dataStart == 0 || dataStart + dataLength > wav.Length)
         {
-            Log.LogWarning("Placeholder shotgun shot is not 16-bit PCM.");
+            Log.LogWarning("Shotgun fire sound is not 16-bit PCM.");
             return null;
         }
 
@@ -580,7 +689,7 @@ public partial class Plugin : BaseUnityPlugin
             samples[i] = value / 32768f;
         }
 
-        var clip = AudioClip.Create("ShotgunBlast", sampleCount / channels, channels, sampleRate, false);
+        var clip = AudioClip.Create("shotgun_fire_01", sampleCount / channels, channels, sampleRate, false);
         clip.SetData(samples, 0);
         return clip;
     }

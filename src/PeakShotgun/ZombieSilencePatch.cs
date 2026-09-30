@@ -1,7 +1,7 @@
 using System.Reflection;
 using HarmonyLib;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 [HarmonyPatch]
 internal static class ZombieSilencePatch

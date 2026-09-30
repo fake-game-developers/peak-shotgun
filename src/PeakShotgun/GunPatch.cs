@@ -1,7 +1,7 @@
 using HarmonyLib;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 [HarmonyPatch(typeof(Character), "Awake")]
 internal static class GunPatch

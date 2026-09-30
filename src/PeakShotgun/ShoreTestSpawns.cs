@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Zorro.Core;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 internal static class ShoreTestSpawns
 {
@@ -21,6 +21,11 @@ internal static class ShoreTestSpawns
 
     internal static IEnumerator WhenTheShoreIsReady()
     {
+        if (!Plugin.DebugMode)
+        {
+            yield break;
+        }
+
         var wait = new WaitForSecondsRealtime(1f);
         bool spawnedShore = false;
         bool spawnedAirport = false;
@@ -106,8 +111,9 @@ internal static class ShoreTestSpawns
                     continue;
                 }
 
-                // Shore loot pool so RootsLuggagePatch injects a shotgun.
-                luggage.spawnPool = SpawnPool.LuggageBeach;
+                // Roots loot pool so RootsLuggagePatch injects a shotgun (zombie biome only).
+                // Debug luggage on the Airport/Shore still uses this pool so a shotgun appears for testing.
+                luggage.spawnPool = SpawnPool.LuggageRoots;
                 luggage.OpenImmediatelyNoNotify();
                 Plugin.Log.LogInfo($"Spawned test luggage '{prefabName}' at the {place}.");
                 return;

@@ -1,7 +1,7 @@
 using HarmonyLib;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 /// <summary>
 /// Legs must not shove the gun. CharacterController ignores Rigidbody.excludeLayers, so a solid
@@ -282,5 +282,34 @@ internal static class ShotgunItemStatePatch
         }
 
         __instance.GetComponent<ShotgunPhysics>()?.Apply();
+    }
+}
+
+/// <summary>
+/// While equipping, <c>CharacterItems.Equip</c> places the item at <c>GetItemHoldPos(item, pushOffTerrain: true)</c>
+/// and then teleports both hand bones onto its anchors and joins them there. Our hold target sits 1.3-1.5 m out, far
+/// past arm's reach, so the arms snap back and can fling the gun through the body, where the torso traps the arms
+/// (gun inside the chest, muzzle out the front). The held pose is not networked: every client runs this for every
+/// holder, so remote scouts land in that trap on their own. Vanilla's terrain push only pulls toward the hip, which
+/// traps it too. Seat the gun <see cref="EquipReach"/> from the right shoulder toward the target instead; the hold
+/// force then straightens the arms out. Held colliders are triggers, so terrain needs no push.
+/// </summary>
+[HarmonyPatch(typeof(CharacterItems), nameof(CharacterItems.GetItemHoldPos))]
+internal static class ShotgunHoldPosPatch
+{
+    // Roughly where the right hand settles in a good hold (shoulder → grip ≈ 0.35 m in the equip log).
+    private const float EquipReach = 0.35f;
+
+    [HarmonyPostfix]
+    private static void SeatWithinReach(CharacterItems __instance, Item item, bool pushOffTerrain, ref Vector3 __result)
+    {
+        if (!pushOffTerrain || item == null || item.GetComponent<ShotgunInstanceSetup>() == null)
+        {
+            return;
+        }
+
+        Vector3 shoulder = __instance.character.GetBodypart(BodypartType.Arm_R).transform.position;
+        Vector3 target = __instance.GetItemHoldPos(item, pushOffTerrain: false);
+        __result = shoulder + Vector3.ClampMagnitude(target - shoulder, EquipReach);
     }
 }

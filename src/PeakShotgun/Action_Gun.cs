@@ -4,7 +4,7 @@ using Photon.Pun;
 using UnityEngine;
 using Zorro.Core;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 public class Action_Gun : ItemAction
 {
@@ -60,7 +60,6 @@ public class Action_Gun : ItemAction
 
         item.photonView.RPC(nameof(Action_Ammo.ReduceUsesRPC), RpcTarget.All);
         OnShoot?.Invoke();
-        shotSFX?.Play(transform.position);
 
         Vector3 origin = spawnTransform.position;
         Vector3 forward = MainCamera.instance.transform.forward;
@@ -72,6 +71,13 @@ public class Action_Gun : ItemAction
 
         right.Normalize();
         Vector3 up = Vector3.Cross(forward, right);
+
+        // Bodypart forces are applied once per physics step, so this acceleration adds exactly Recoil m/s.
+        if (Plugin.Recoil > 0f)
+        {
+            character.AddForce(-forward * (Plugin.Recoil / Time.fixedDeltaTime));
+        }
+
         var struck = new List<Character>();
 
         for (int i = 0; i < pelletCount; i++)
@@ -178,6 +184,7 @@ public class Action_Gun : ItemAction
     [PunRPC]
     private void RPC_ShotgunBlastFX(Vector3 origin, Vector3 forward)
     {
+        shotSFX?.Play(origin);
         GetComponent<ShotgunVFX>()?.Play(origin, forward);
         GamefeelHandler.instance.AddPerlinShakeProximity(origin + forward * 3f, 12f);
     }

@@ -1,5 +1,5 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/PeakShotgun/PeakShotgun.csproj" />
+    <Project Path="src/PeakShotgun/Peak.Shotgun.csproj" />
   </Folder>
 </Solution>

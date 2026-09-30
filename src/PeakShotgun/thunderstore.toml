@@ -7,7 +7,7 @@ repository = "https://thunderstore.io"
 [package]
 namespace = "FakeGameDevelopers"
 name = "PeakShotgun"
-description = "A shotgun built from PEAK's blowgun. Blasts flip zombies harder than a coconut and dose them with drowsy."
+description = "A shotgun from PEAK's blowgun. Roots always has at least two luggage with one; optional any-biome spawns. Blasts flip zombies harder than a coconut."
 websiteUrl = "https://github.com/TheCodinPro/Peak_AKGun"
 containsNsfwContent = false
 
@@ -32,6 +32,10 @@ target = "/"
 [[build.copy]]
 source = "../../LICENSE"
 target = "/"
+
+[[build.copy]]
+source = "../../media/"
+target = "/media/"
 
 [publish]
 communities = [ "peak", ]

@@ -3,7 +3,7 @@ using Peak.Afflictions;
 using Photon.Pun;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 public class GunCharacterLaunch : MonoBehaviour
 {
