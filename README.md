@@ -54,7 +54,7 @@ Every push to `master` runs [.github/workflows/thunderstore.yml](.github/workflo
 1. Builds a Thunderstore ZIP (using stripped [PEAKGameLibs](https://www.nuget.org/packages/PEAKGameLibs) for compile references)
 2. Uploads a workflow artifact named **`FakeGameDevelopers-PeakShotgun`**
 
-Every push still builds that zip. Thunderstore publish runs only when `<Version>` in `src/PeakShotgun/PeakShotgun.csproj` changes, and the organization secret `TCLI_AUTH_TOKEN` is set. The publish step copies the categories already on the package, so a new version keeps the same tags. A commit that leaves the version unchanged only builds the artifact.
+Every push still builds that zip. Thunderstore publish runs only when `<Version>` in `src/PeakShotgun/Peak.Shotgun.csproj` changes, and the organization secret `TCLI_AUTH_TOKEN` is set. The publish step copies the categories already on the package, so a new version keeps the same tags. A commit that leaves the version unchanged only builds the artifact.
 
 ### Local package build
 

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 /// <summary>
 /// PEAK's default near plane clips the custom shotgun when you stand over it.

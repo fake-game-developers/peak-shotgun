@@ -2,7 +2,7 @@ using Photon.Pun;
 using UnityEngine;
 using Zorro.Core;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 public class Action_Ammo : ItemAction
 {

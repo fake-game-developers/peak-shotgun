@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 /// <summary>
 /// Marks a shotgun visual as using a luggage-only rest pose so <see cref="ShotgunVisualOrient"/>

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 /// <summary>
 /// Lives on the ShotgunVisual child so networked clones cannot lose the mesh reference.

@@ -1,7 +1,7 @@
 using HarmonyLib;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 /// <summary>
 /// PEAK centers luggage items on mainRenderer.bounds, then applies offsetLuggagePosition.

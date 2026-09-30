@@ -13,7 +13,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Zorro.Core;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 [BepInAutoPlugin]
 [BepInDependency(ItemsPlugin.Id)]
@@ -510,7 +510,7 @@ public partial class Plugin : BaseUnityPlugin
 
     private static void ApplyIcon(Item item)
     {
-        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("PeakShotgun.icons.ShotgunIcon.png");
+        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Peak.Shotgun.icons.ShotgunIcon.png");
         if (stream == null)
         {
             Log.LogWarning("Shotgun icon resource was not found.");
@@ -533,7 +533,7 @@ public partial class Plugin : BaseUnityPlugin
 
     private static SFX_Instance? PlaceholderShot()
     {
-        AudioClip? clip = LoadWav("PeakShotgun.sounds.ShotgunBlast.wav");
+        AudioClip? clip = LoadWav("Peak.Shotgun.sounds.ShotgunBlast.wav");
         if (clip == null)
         {
             Log.LogWarning("Placeholder shotgun shot was not found. Using the blowgun sound.");

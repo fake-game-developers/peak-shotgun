@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Zorro.Core;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 internal static class ShoreTestSpawns
 {

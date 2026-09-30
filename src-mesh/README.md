@@ -37,5 +37,5 @@ python build_mesh.py --target-faces 12000
 Then from the repo root:
 
 ```bash
-dotnet build peak-shotgun.slnx -c Release
+dotnet build Peak.Shotgun.slnx -c Release
 ```

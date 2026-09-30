@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           MANAGED_DIR="$PWD/.gamelibs"
-          dotnet build peak-shotgun.slnx -c Release -target:PackTS -v m \
+          dotnet build Peak.Shotgun.slnx -c Release -target:PackTS -v m \
             -p:ManagedDir="$MANAGED_DIR/" \
             -p:PeakGameRootDir=""
 
@@ -68,7 +68,7 @@ jobs:
           BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          csproj=src/PeakShotgun/PeakShotgun.csproj
+          csproj=src/PeakShotgun/Peak.Shotgun.csproj
           version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$csproj")
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -118,7 +118,7 @@ jobs:
             exit 1
           fi
           MANAGED_DIR="$PWD/.gamelibs"
-          dotnet build peak-shotgun.slnx -c Release -target:PackTS -v m \
+          dotnet build Peak.Shotgun.slnx -c Release -target:PackTS -v m \
             -p:ManagedDir="$MANAGED_DIR/" \
             -p:PeakGameRootDir="" \
             -p:PublishTS=true

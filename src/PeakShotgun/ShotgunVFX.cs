@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 public class ShotgunVFX : MonoBehaviour
 {

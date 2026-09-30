@@ -1,7 +1,7 @@
 using HarmonyLib;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 /// <summary>
 /// Legs must not shove the gun. CharacterController ignores Rigidbody.excludeLayers, so a solid

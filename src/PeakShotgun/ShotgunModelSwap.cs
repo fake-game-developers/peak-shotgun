@@ -4,12 +4,12 @@ using System.IO;
 using System.Reflection;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 internal static class ShotgunModelSwap
 {
-    private const string ObjResource = "PeakShotgun.models.shotgun.obj";
-    private const string AlbedoResource = "PeakShotgun.models.shotgun_albedo.png";
+    private const string ObjResource = "Peak.Shotgun.models.shotgun.obj";
+    private const string AlbedoResource = "Peak.Shotgun.models.shotgun_albedo.png";
 
     internal static Transform? Apply(GameObject gunObject, ItemDatabase database)
     {

@@ -2,7 +2,7 @@
 
 Map of the shotgun mod for agents and developers. The player-facing setup is in [README.md](README.md).
 
-The disk folder is still `Peak_AKGun`. The solution is `peak-shotgun.slnx`. The C# assembly, BepInEx plugin, and Thunderstore name are `PeakShotgun`.
+The disk folder is still `Peak_AKGun`. The solution is `Peak.Shotgun.slnx`. The C# namespace is `Peak.Shotgun`. The assembly, BepInEx plugin, and Thunderstore name are `PeakShotgun`.
 
 The gun is not a new model. `Plugin.CreateFromBlowgun` waits for PEAK's item catalog, clones the blowgun, strips its `ItemAction`s, and registers that clone with PEAKLib. The world mesh stays the blowgun. Do not replace the blowgun item itself.
 
@@ -19,10 +19,10 @@ The gun is not a new model. `Plugin.CreateFromBlowgun` waits for PEAK's item cat
 | `src/PeakShotgun/thunderstore.toml` | Thunderstore listing. `icon.png` at the repo root is the store icon, not the in-game one |
 | `artifacts/bin/PeakShotgun/release/PeakShotgun.dll` | Release build |
 
-Embedded resource names are set in `PeakShotgun.csproj` and must match the `GetManifestResourceStream` strings in `Plugin.cs`:
+Embedded resource names are set in `Peak.Shotgun.csproj` and must match the `GetManifestResourceStream` strings in `Plugin.cs`:
 
-- `PeakShotgun.icons.ShotgunIcon.png`
-- `PeakShotgun.sounds.ShotgunBlast.wav`
+- `Peak.Shotgun.icons.ShotgunIcon.png`
+- `Peak.Shotgun.sounds.ShotgunBlast.wav`
 
 New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay lowercase. Add an `EmbeddedResource` with an explicit `LogicalName` when the game should load the file.
 
@@ -89,7 +89,7 @@ Do not add a `ParticleSystem` with `Shader.Find` or a copied material. PEAK does
 ## Build
 
 ```bash
-dotnet build peak-shotgun.slnx -c Release
+dotnet build Peak.Shotgun.slnx -c Release
 ```
 
 `Directory.Build.props` finds the PEAK install and references `PEAK_Data/Managed`. `PackTS` (`./build.sh`) writes `artifacts/thunderstore/FakeGameDevelopers-PeakShotgun-<version>.zip`. Publishing is described in the player README. Do not bump `<Version>` unless a release was asked for.

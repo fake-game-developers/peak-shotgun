@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 
-namespace PeakShotgun;
+namespace Peak.Shotgun;
 
 [HarmonyPatch(typeof(ItemDatabase), nameof(ItemDatabase.OnLoaded))]
 internal static class ItemDatabasePatch
