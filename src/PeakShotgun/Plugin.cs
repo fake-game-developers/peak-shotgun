@@ -295,7 +295,7 @@ public partial class Plugin : BaseUnityPlugin
         RestRotZ = Config.Bind("Model", "RestRotZ", 0f, "Rest (luggage/ground) local Z euler rotation of the custom mesh.").Value;
         // Luggage-only flat diagonal: yaw around the suitcase floor normal on the visual (not the item root).
         LuggageYaw = Config.Bind("Model", "LuggageYaw", 45f, "Luggage-only yaw around the suitcase floor normal (degrees). Flip sign if diagonal goes the wrong way.").Value;
-        LuggageLiftExtra = Config.Bind("Model", "LuggageLiftExtra", 0.01f, "Extra padding above the luggage floor after snapping the mesh bottom onto the spawn plane.").Value;
+        LuggageLiftExtra = Config.Bind("Model", "LuggageFloorPad", 0.025f, "Extra padding above the luggage floor after snapping the mesh bottom onto the suitcase lining.").Value;
         new Harmony(Name ?? "PeakShotgun").PatchAll();
         gameObject.AddComponent<ShotgunCameraNearClip>();
         StartCoroutine(WaitForBlowgun());
