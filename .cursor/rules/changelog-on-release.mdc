@@ -1,0 +1,41 @@
+---
+description: Require a CHANGELOG.md entry for every new mod version
+alwaysApply: true
+---
+
+# Changelog required for new mod versions
+
+Any release that bumps the mod version **must** include a matching changelog entry in the same change set.
+
+## When this applies
+
+- Bumping `<Version>` in `src/PeakShotgun/Peak.Shotgun.csproj`
+- Any change intended as a new Thunderstore / mod release
+- Do not bump `<Version>` unless a release was asked for (see `AGENTS.md`)
+
+## Required updates (same change set)
+
+1. `src/PeakShotgun/Peak.Shotgun.csproj` — new `<Version>`
+2. `CHANGELOG.md` — new section for that exact version
+
+`thunderstore.toml` copies `CHANGELOG.md` into the package; a missing or stale entry ships an empty/wrong changelog on Thunderstore.
+
+## Changelog format
+
+Newest version at the top. Match existing style:
+
+```markdown
+## X.Y.Z
+
+- Short, player-facing bullet for each notable change
+```
+
+- Use the same version string as `<Version>` (e.g. `1.0.3`)
+- Prefer concise, user-visible notes (fixes, features, config, behavior)
+- Skip internal-only noise unless it affects players (e.g. CI-only bumps may still need a one-line note)
+
+## Checklist before finishing a version bump
+
+- [ ] `<Version>` bumped in the csproj
+- [ ] `CHANGELOG.md` has a `## <that-version>` section with bullets
+- [ ] Version strings match exactly
