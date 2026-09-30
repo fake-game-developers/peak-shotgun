@@ -1,10 +1,10 @@
 # peak-shotgun
 
-![Shotgun preview](media/1.jpg)
+![Shotgun preview](https://raw.githubusercontent.com/fake-game-developers/peak-shotgun/fix/held-pose-and-dither/media/img1.jpg)
 
-![Shotgun preview](media/2.jpg)
+![Shotgun preview](https://raw.githubusercontent.com/fake-game-developers/peak-shotgun/fix/held-pose-and-dither/media/img2.jpg)
 
-![Shotgun preview](media/3.jpg)
+![Shotgun preview](https://raw.githubusercontent.com/fake-game-developers/peak-shotgun/fix/held-pose-and-dither/media/img3.jpg)
 
 Turns PEAK's leftover blowgun into a shotgun.
 
