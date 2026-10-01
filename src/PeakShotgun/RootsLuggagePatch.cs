@@ -29,39 +29,80 @@ internal static class SpawnerLootContextPatch
 }
 
 /// <summary>
-/// Roots: force <see cref="Plugin.GuaranteedLuggageShotguns"/> random suitcases.
-/// Every biome: hard-cap how many luggage can yield a shotgun this run.
+/// Makes the shotgun an invalid loot roll while the current luggage's biome is at its cap, so
+/// <c>LootData.GetRandomItems</c> fills the slot with something else instead of losing it.
+/// </summary>
+[HarmonyPatch(typeof(Item), nameof(Item.IsValidToSpawn))]
+internal static class ShotgunSpawnValidityPatch
+{
+    [HarmonyPostfix]
+    private static void BlockAtCap(Item __instance, ref bool __result)
+    {
+        if (__result
+            && Plugin.ShotgunPrefab != null
+            && __instance.gameObject == Plugin.ShotgunPrefab
+            && RootsLuggagePatch.ShotgunBlockedForCurrentRoll())
+        {
+            __result = false;
+        }
+    }
+}
+
+/// <summary>
+/// Roots: force <see cref="Plugin.GuaranteedLuggageShotguns"/> random suitcases (when the run allows the shotgun).
+/// Every biome: hard-cap how many luggage can yield a shotgun this run. The bookkeeping lives in
+/// <see cref="ShotgunLootLedger"/>, so it survives quicksave reloads and host migration.
 /// </summary>
 [HarmonyPatch(typeof(LootData), nameof(LootData.GetRandomItems))]
 internal static class RootsLuggagePatch
 {
     private static Spawner? currentSpawner;
-    private static HashSet<int>? chosenLuggageIds;
-    private static bool assignedThisRun;
 
-    /// <summary>How many luggage in each biome pool have already received a shotgun this run.</summary>
-    private static readonly Dictionary<SpawnPool, int> spawnedPerBiome = new();
-
-    internal static void ResetGuarantees()
-    {
-        assignedThisRun = false;
-        chosenLuggageIds = null;
-        currentSpawner = null;
-        spawnedPerBiome.Clear();
-    }
+    // Set while re-rolling a blocked shotgun slot: the nested GetRandomItems must neither inject nor roll a shotgun.
+    private static bool rollingReplacement;
 
     internal static void BeginSpawn(Spawner spawner) => currentSpawner = spawner;
 
     internal static void EndSpawn() => currentSpawner = null;
 
-    [HarmonyPostfix]
-    private static void AfterLootRoll(SpawnPool spawnPool, ref List<GameObject>? __result)
+    /// <summary>
+    /// Called from <see cref="ShotgunSpawnValidityPatch"/>: while luggage rolls loot, the shotgun stops being a
+    /// valid roll once its biome hit <see cref="Plugin.MaxShotgunsPerBiome"/>, so the slot gets ordinary loot.
+    /// </summary>
+    internal static bool ShotgunBlockedForCurrentRoll()
     {
-        TryGuaranteeRootsShotgun(spawnPool, ref __result);
-        EnforcePerBiomeCap(spawnPool, ref __result);
+        if (rollingReplacement)
+        {
+            return true;
+        }
+
+        if (currentSpawner is not Luggage luggage)
+        {
+            return false;
+        }
+
+        SpawnPool biome = LuggageBiomeKey(luggage, luggage.spawnPool);
+        return ShotgunLootLedger.CountInBiome(biome, except: luggage) >= Plugin.MaxShotgunsPerBiome;
     }
 
-    private static void TryGuaranteeRootsShotgun(SpawnPool spawnPool, ref List<GameObject>? __result)
+    [HarmonyPostfix]
+    private static void AfterLootRoll(
+        SpawnPool spawnPool,
+        int count,
+        bool canRepeat,
+        GameObject? fallback,
+        ref List<GameObject>? __result)
+    {
+        if (rollingReplacement)
+        {
+            return;
+        }
+
+        TryGuaranteeRootsShotgun(spawnPool, count, ref __result);
+        EnforcePerBiomeCap(spawnPool, canRepeat, fallback, ref __result);
+    }
+
+    private static void TryGuaranteeRootsShotgun(SpawnPool spawnPool, int count, ref List<GameObject>? __result)
     {
         // Forced shotguns are always Roots-only, regardless of CanSpawnOnAnyBiome.
         if ((spawnPool & SpawnPool.LuggageRoots) == 0 || currentSpawner is not Luggage luggage)
@@ -70,13 +111,13 @@ internal static class RootsLuggagePatch
         }
 
         EnsureRandomLuggagePicked(luggage);
-        if (chosenLuggageIds == null || !chosenLuggageIds.Contains(luggage.GetInstanceID()))
+        if (!ShotgunLootLedger.IsChosen(luggage))
         {
             return;
         }
 
         GameObject? shotgun = Plugin.ShotgunPrefab;
-        if (shotgun == null)
+        if (shotgun == null || count <= 0)
         {
             return;
         }
@@ -94,51 +135,59 @@ internal static class RootsLuggagePatch
             }
         }
 
-        __result.Insert(0, shotgun);
+        // The guarantee applies only while the run allows the shotgun (custom-run item settings, cap).
+        Item? shotgunItem = shotgun.GetComponent<Item>();
+        if (shotgunItem == null || !shotgunItem.IsValidToSpawn())
+        {
+            Plugin.Log.LogInfo(
+                $"Skipped forced shotgun in Roots luggage '{luggage.name}': not valid to spawn in this run.");
+            return;
+        }
+
+        // The spawner only fills `count` spots; a longer list silently drops its last item.
+        if (__result.Count < count)
+        {
+            __result.Insert(0, shotgun);
+        }
+        else
+        {
+            __result[0] = shotgun;
+        }
+
         Plugin.Log.LogInfo(
             $"Forced shotgun into random Roots luggage '{luggage.name}' "
-            + $"({chosenLuggageIds.Count} marked this run).");
+            + $"({ShotgunLootLedger.ChosenCount} marked this run).");
     }
 
     /// <summary>
-    /// After loot (and Roots guarantees) are decided, strip extra shotguns so each luggage
-    /// biome yields at most <see cref="Plugin.MaxShotgunsPerBiome"/> this run.
+    /// After loot (and Roots guarantees) are decided, count the shotguns against the biome cap. Shotguns past
+    /// <see cref="Plugin.MaxShotgunsPerBiome"/> are replaced with other loot from the same pool so the suitcase
+    /// still spawns as many items as it rolled.
     /// </summary>
-    private static void EnforcePerBiomeCap(SpawnPool spawnPool, ref List<GameObject>? __result)
+    private static void EnforcePerBiomeCap(
+        SpawnPool spawnPool,
+        bool canRepeat,
+        GameObject? fallbackSpawn,
+        ref List<GameObject>? __result)
     {
         GameObject? shotgun = Plugin.ShotgunPrefab;
-        if (__result == null || shotgun == null || currentSpawner is not Luggage)
+        if (__result == null || shotgun == null || currentSpawner is not Luggage luggage)
         {
             return;
         }
 
-        int shotgunSlots = 0;
-        for (int i = 0; i < __result.Count; i++)
+        SpawnPool biome = LuggageBiomeKey(luggage, spawnPool);
+        if (!__result.Contains(shotgun))
         {
-            if (__result[i] == shotgun)
-            {
-                shotgunSlots++;
-            }
-        }
-
-        if (shotgunSlots == 0)
-        {
+            // A suitcase re-rolled after a reload may no longer hold the shotgun it was counted for.
+            ShotgunLootLedger.SetShotguns(luggage, biome, 0);
             return;
         }
 
-        SpawnPool biome = LuggageBiomeKey(currentSpawner, spawnPool);
-        spawnedPerBiome.TryGetValue(biome, out int already);
+        int already = ShotgunLootLedger.CountInBiome(biome, except: luggage);
         int allowed = Mathf.Max(0, Plugin.MaxShotgunsPerBiome - already);
-        if (allowed <= 0)
-        {
-            RemoveAllShotguns(__result, shotgun);
-            Plugin.Log.LogInfo(
-                $"Blocked shotgun in '{currentSpawner.name}' — biome {biome} already hit cap "
-                + $"{Plugin.MaxShotgunsPerBiome} this run.");
-            return;
-        }
-
         int kept = 0;
+        int blocked = 0;
         for (int i = 0; i < __result.Count;)
         {
             if (__result[i] != shotgun)
@@ -154,30 +203,78 @@ internal static class RootsLuggagePatch
                 continue;
             }
 
-            __result.RemoveAt(i);
+            blocked++;
+            GameObject? replacement = RollReplacement(spawnPool, canRepeat, fallbackSpawn, __result, shotgun);
+            if (replacement == null)
+            {
+                __result.RemoveAt(i);
+                continue;
+            }
+
+            __result[i] = replacement;
+            i++;
         }
 
+        if (blocked > 0)
+        {
+            Plugin.Log.LogInfo(
+                $"Blocked {blocked} shotgun(s) in '{currentSpawner.name}' — biome {biome} already at cap "
+                + $"{Plugin.MaxShotgunsPerBiome} this run; replaced with other loot.");
+        }
+
+        ShotgunLootLedger.SetShotguns(luggage, biome, kept);
         if (kept > 0)
         {
-            spawnedPerBiome[biome] = already + kept;
             Plugin.Log.LogInfo(
                 $"Luggage '{currentSpawner.name}' biome {biome}: +{kept} shotgun "
-                + $"({spawnedPerBiome[biome]}/{Plugin.MaxShotgunsPerBiome} this run).");
+                + $"({already + kept}/{Plugin.MaxShotgunsPerBiome} this run).");
         }
     }
 
-    private static void RemoveAllShotguns(List<GameObject> result, GameObject shotgun)
+    /// <summary>Rolls one non-shotgun item from the same pool, preferring one the suitcase does not already hold.</summary>
+    private static GameObject? RollReplacement(
+        SpawnPool spawnPool,
+        bool canRepeat,
+        GameObject? fallbackSpawn,
+        List<GameObject> current,
+        GameObject shotgun)
     {
-        for (int i = result.Count - 1; i >= 0; i--)
+        List<GameObject>? roll;
+        rollingReplacement = true;
+        try
         {
-            if (result[i] == shotgun)
-            {
-                result.RemoveAt(i);
-            }
+            roll = LootData.GetRandomItems(spawnPool, current.Count + 1, canRepeat, fallbackSpawn);
         }
+        finally
+        {
+            rollingReplacement = false;
+        }
+
+        if (roll == null)
+        {
+            return null;
+        }
+
+        GameObject? fallback = null;
+        foreach (GameObject candidate in roll)
+        {
+            if (candidate == null || candidate == shotgun)
+            {
+                continue;
+            }
+
+            if (!current.Contains(candidate))
+            {
+                return candidate;
+            }
+
+            fallback ??= candidate;
+        }
+
+        return fallback;
     }
 
-    private static SpawnPool LuggageBiomeKey(Spawner spawner, SpawnPool rolledPool)
+    internal static SpawnPool LuggageBiomeKey(Spawner spawner, SpawnPool rolledPool)
     {
         SpawnPool pool;
         try
@@ -204,12 +301,11 @@ internal static class RootsLuggagePatch
     /// </summary>
     private static void EnsureRandomLuggagePicked(Luggage opening)
     {
-        if (assignedThisRun)
+        if (ShotgunLootLedger.Assigned)
         {
             return;
         }
 
-        assignedThisRun = true;
         var candidates = new List<Luggage>();
         foreach (Luggage luggage in Luggage.ALL_LUGGAGE)
         {
@@ -224,9 +320,9 @@ internal static class RootsLuggagePatch
             candidates.Add(opening);
         }
 
-        chosenLuggageIds = new HashSet<int>();
         if (candidates.Count == 0)
         {
+            ShotgunLootLedger.MarkAssigned(candidates);
             Plugin.Log.LogWarning("No Roots luggage found to mark for shotgun spawns.");
             return;
         }
@@ -238,10 +334,7 @@ internal static class RootsLuggagePatch
         }
 
         int take = Mathf.Min(Plugin.GuaranteedLuggageShotguns, candidates.Count);
-        for (int i = 0; i < take; i++)
-        {
-            chosenLuggageIds.Add(candidates[i].GetInstanceID());
-        }
+        ShotgunLootLedger.MarkAssigned(candidates.GetRange(0, take));
 
         Plugin.Log.LogInfo(
             $"Marked {take} random Roots luggage for a shotgun (of {candidates.Count} candidates).");

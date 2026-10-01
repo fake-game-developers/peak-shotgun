@@ -45,15 +45,9 @@ internal static class LuggageShotgunOffsetPatch
         item.transform.position -= __instance.transform.rotation * item.offsetLuggagePosition;
 
         Quaternion luggageRot = Plugin.LuggageVisualRotation(item.transform, up);
-        Vector3 luggagePos = new(Plugin.RestPosX, Plugin.RestPosY, Plugin.RestPosZ);
+        Vector3 luggagePos = LuggageRestPosition;
         visual.localPosition = luggagePos;
         visual.localRotation = luggageRot;
-
-        ShotgunLuggageRest pose = visual.GetComponent<ShotgunLuggageRest>()
-            ?? visual.gameObject.AddComponent<ShotgunLuggageRest>();
-        pose.LocalPosition = luggagePos;
-        pose.LocalRotation = luggageRot;
-        pose.Armed = true;
 
         float minAlongUp = MinMeshAlongUp(visual, mesh, up);
         float delta = floorAlongUp - minAlongUp + Plugin.LuggageLiftExtra;
@@ -76,11 +70,18 @@ internal static class LuggageShotgunOffsetPatch
             rig.constraints = RigidbodyConstraints.FreezeAll;
         }
 
-        item.GetComponent<ShotgunPhysics>()?.Apply();
+        // Sent to the other clients from LuggageShotgunSyncPatch, after PEAK's own SetKinematicRPC.
+        GetOrAddRest(item).Arm(luggagePos, luggageRot);
+        ShotgunLootLedger.SavePose(__instance, luggagePos, luggageRot);
         item.ForceSyncForFrames();
         Plugin.Log.LogInfo(
             $"Luggage seat yaw={Plugin.LuggageYaw:0.#}° Δ={delta:0.###} (spawn-spot, liftExtra={Plugin.LuggageLiftExtra:0.###}).");
     }
+
+    internal static Vector3 LuggageRestPosition => new(Plugin.RestPosX, Plugin.RestPosY, Plugin.RestPosZ);
+
+    internal static ShotgunLuggageRest GetOrAddRest(Item item) =>
+        item.GetComponent<ShotgunLuggageRest>() ?? item.gameObject.AddComponent<ShotgunLuggageRest>();
 
     private static float MinMeshAlongUp(Transform visual, Mesh mesh, Vector3 up)
     {
@@ -94,5 +95,62 @@ internal static class LuggageShotgunOffsetPatch
         }
 
         return minAlongUp;
+    }
+}
+
+/// <summary>
+/// Luggage calls <c>Spawner.InitializePhysics</c> on the host after placing each item, both for fresh loot
+/// (after <c>OffsetSpawn</c>) and for loot restored from a save (<c>SpawnAndTrackFromItemHistory</c>, which
+/// restores the seated root transform but skips <c>OffsetSpawn</c>). Restored guns get the seat pose saved in
+/// <see cref="ShotgunLootLedger"/> (the current config only when none was saved) and count against the biome
+/// cap; then the pose is sent to the other clients so they render and freeze the gun the same way.
+/// </summary>
+[HarmonyPatch(typeof(Spawner), nameof(Spawner.InitializePhysics))]
+internal static class LuggageShotgunSyncPatch
+{
+    // Restored loot that was moved out of its suitcase before saving keeps its ordinary ground pose.
+    private const float RestoreSlack = 0.5f;
+
+    [HarmonyPostfix]
+    private static void SyncLuggageRest(Spawner __instance, Item newItem)
+    {
+        if (__instance is not Luggage luggage
+            || luggage is RespawnChest
+            || newItem == null
+            || !newItem.offsetLuggageSpawn
+            || newItem.GetComponent<ShotgunInstanceSetup>() == null)
+        {
+            return;
+        }
+
+        ShotgunLuggageRest rest = LuggageShotgunOffsetPatch.GetOrAddRest(newItem);
+        if (!rest.Armed)
+        {
+            if (!IsInside(luggage, newItem))
+            {
+                return;
+            }
+
+            bool saved = ShotgunLootLedger.TryGetPose(luggage, out Vector3 position, out Quaternion rotation);
+            if (!saved)
+            {
+                position = LuggageShotgunOffsetPatch.LuggageRestPosition;
+                rotation = Plugin.LuggageVisualRotation(newItem.transform, luggage.transform.up);
+            }
+
+            rest.Arm(position, rotation);
+            ShotgunLootLedger.NoteRestored(luggage, RootsLuggagePatch.LuggageBiomeKey(luggage, luggage.spawnPool));
+            Plugin.Log.LogInfo(
+                $"Restored luggage seat for a saved shotgun in '{luggage.name}' ({(saved ? "saved pose" : "current config")}).");
+        }
+
+        rest.Broadcast();
+    }
+
+    private static bool IsInside(Luggage luggage, Item item)
+    {
+        Bounds bounds = HelperFunctions.GetTotalBounds(luggage.meshRenderers);
+        bounds.Expand(RestoreSlack);
+        return bounds.Contains(item.transform.position);
     }
 }

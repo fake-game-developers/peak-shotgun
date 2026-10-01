@@ -59,6 +59,11 @@ internal sealed class ShotgunInstanceSetup : MonoBehaviour
             gameObject.AddComponent<ShotgunPhysics>();
         }
 
+        if (GetComponent<ShotgunLuggageRest>() == null)
+        {
+            gameObject.AddComponent<ShotgunLuggageRest>();
+        }
+
         if (visual != null && visual.GetComponent<ShotgunVisualOrient>() == null)
         {
             visual.gameObject.AddComponent<ShotgunVisualOrient>();

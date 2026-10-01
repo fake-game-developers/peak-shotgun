@@ -14,24 +14,24 @@
   </ItemGroup>
 
   <!-- Fallback Unity stubs only when PEAK Managed is missing (build will still fail without game types). -->
-  <ItemGroup Condition="'$(ManagedDir)' == '' or !Exists('$(ManagedDir)')">
+  <ItemGroup Condition="'$(PeakManagedDir)' == '' or !Exists('$(PeakManagedDir)')">
     <PackageReference Include="UnityEngine.Modules" Version="6000.0.36" PrivateAssets="all" />
   </ItemGroup>
 
   <Target Name="EnsurePeakManagedAssemblies" BeforeTargets="ResolveAssemblyReferences">
     <Error
       Text="PEAK game assemblies not found. Install PEAK, or set PEAK_GAME_DIR / -p:PeakGameRootDir= to your PEAK folder (the one containing PEAK.exe)."
-      Condition="'$(ManagedDir)' == '' or !Exists('$(ManagedDir)Assembly-CSharp.dll')"
+      Condition="'$(PeakManagedDir)' == '' or !Exists('$(PeakManagedDir)Assembly-CSharp.dll')"
     />
   </Target>
 
-  <ItemGroup Condition="'$(ManagedDir)' != '' and Exists('$(ManagedDir)')">
+  <ItemGroup Condition="'$(PeakManagedDir)' != '' and Exists('$(PeakManagedDir)')">
     <LocalReferences
-      Include="$(ManagedDir)*.dll"
-      Exclude="$(ManagedDir)Mono*.dll;$(ManagedDir)netstandard.dll;$(ManagedDir)System*.dll;$(ManagedDir)mscorlib.dll"
+      Include="$(PeakManagedDir)*.dll"
+      Exclude="$(PeakManagedDir)Mono*.dll;$(PeakManagedDir)netstandard.dll;$(PeakManagedDir)System*.dll;$(PeakManagedDir)mscorlib.dll"
     />
     <Reference Include="@(LocalReferences)" Private="false" />
-    <Reference Include="$(ManagedDir)Assembly-CSharp.dll" Private="false" Publicize="true" />
+    <Reference Include="$(PeakManagedDir)Assembly-CSharp.dll" Private="false" Publicize="true" />
   </ItemGroup>
 
   <!--

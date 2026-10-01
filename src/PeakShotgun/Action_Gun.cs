@@ -27,17 +27,240 @@ public class Action_Gun : ItemAction
 
     public System.Action? OnShoot;
 
+    // An unanswered request is re-sent with the same id after this long (message lost, host changed).
+    private const float PendingShotRetry = 1.5f;
+
+    // Requests sent fireRate apart can arrive bunched up by network jitter.
+    private const float HostFireRateTolerance = 0.9f;
+
+    // How long an accepted shot id stays valid for hit RPCs.
+    private const float AuthorizedShotLifetime = 10f;
+
+    private static int nextShotId;
+
     private float lastShootTime = float.NegativeInfinity;
 
+    private int pendingShotId;
+
+    private float pendingShotSentTime;
+
+    private Vector3 pendingForward;
+
+    // Host-side: newest shot id per sender (actor number) and the answer given, so a retry gets the same answer.
+    private readonly Dictionary<int, (int shotId, bool accepted)> lastShotBySender = new();
+
+    private double lastAcceptedShotTime = double.NegativeInfinity;
+
+    // Every client: shots the host accepted (shooter actor + shot id) and which targets each one already hit.
+    private readonly Dictionary<long, float> authorizedShots = new();
+
+    private readonly Dictionary<long, HashSet<int>> consumedTargets = new();
+
+    /// <summary>
+    /// Asks the host to authorize one shot. Nothing happens locally until the host accepts it, and only one
+    /// request is outstanding at a time, so the last round cannot be spent twice. An unanswered request is
+    /// retried with the same id; the host answers a retry with its original decision.
+    /// </summary>
     public override void RunAction()
     {
-        if (Time.time <= lastShootTime + fireRate || !HasAmmo())
+        if (pendingShotId != 0)
+        {
+            if (Time.time >= pendingShotSentTime + PendingShotRetry)
+            {
+                pendingForward = MainCamera.instance.transform.forward;
+                SendShotRequest();
+            }
+
+            return;
+        }
+
+        if (Time.time <= lastShootTime + fireRate || !HasAmmo() || spawnTransform == null)
         {
             return;
         }
 
         lastShootTime = Time.time;
-        Fire();
+        pendingShotId = ++nextShotId;
+        pendingForward = MainCamera.instance.transform.forward;
+        SendShotRequest();
+    }
+
+    private void SendShotRequest()
+    {
+        pendingShotSentTime = Time.time;
+        if (!PhotonNetwork.InRoom)
+        {
+            HandleShotRequest(pendingShotId, null, Time.timeAsDouble);
+            return;
+        }
+
+        photonView.RPC(nameof(RPC_RequestShot), RpcTarget.MasterClient, pendingShotId);
+    }
+
+    [PunRPC]
+    public void RPC_RequestShot(int shotId, PhotonMessageInfo info)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            return;
+        }
+
+        HandleShotRequest(shotId, info.Sender, info.SentServerTime);
+    }
+
+    /// <summary>Host (or offline): validate holder, cooldown and ammo, spend once, and announce the result.</summary>
+    private void HandleShotRequest(int shotId, Photon.Realtime.Player? sender, double sentTime)
+    {
+        int senderId = sender?.ActorNumber ?? 0;
+        if (lastShotBySender.TryGetValue(senderId, out (int shotId, bool accepted) last))
+        {
+            if (shotId < last.shotId)
+            {
+                return;
+            }
+
+            if (shotId == last.shotId)
+            {
+                SendShotResult(senderId, shotId, last.accepted);
+                return;
+            }
+        }
+
+        double sinceLastShot = sentTime - lastAcceptedShotTime;
+        // A large negative gap means the server clock wrapped; do not lock the gun forever.
+        bool cooledDown = sinceLastShot >= fireRate * HostFireRateTolerance || sinceLastShot < -60.0;
+        Action_Ammo? ammo = GetComponent<Action_Ammo>();
+        bool accepted = IsHeldBy(sender) && cooledDown && ammo != null && ammo.TrySpendOne();
+        if (accepted)
+        {
+            lastAcceptedShotTime = sentTime;
+        }
+
+        lastShotBySender[senderId] = (shotId, accepted);
+        SendShotResult(senderId, shotId, accepted);
+    }
+
+    private bool IsHeldBy(Photon.Realtime.Player? sender)
+    {
+        Character? holder = item.holderCharacter;
+        if (item.itemState != ItemState.Held || holder == null)
+        {
+            return false;
+        }
+
+        return sender == null || (holder.photonView != null && holder.photonView.Owner == sender);
+    }
+
+    /// <summary>
+    /// Accepted shots go to everyone, so each client can check that a hit RPC belongs to a shot the host paid
+    /// for. Rejections only matter to the shooter.
+    /// </summary>
+    private void SendShotResult(int shooterActor, int shotId, bool accepted)
+    {
+        if (!PhotonNetwork.InRoom)
+        {
+            OnShotResult(shotId, accepted);
+            return;
+        }
+
+        if (accepted)
+        {
+            photonView.RPC(nameof(RPC_ShotResult), RpcTarget.All, shooterActor, shotId, true);
+            return;
+        }
+
+        Photon.Realtime.Player? shooter = PhotonNetwork.CurrentRoom?.GetPlayer(shooterActor);
+        if (shooter != null)
+        {
+            photonView.RPC(nameof(RPC_ShotResult), shooter, shooterActor, shotId, false);
+        }
+    }
+
+    [PunRPC]
+    public void RPC_ShotResult(int shooterActor, int shotId, bool accepted, PhotonMessageInfo info)
+    {
+        if (info.Sender == null || !info.Sender.IsMasterClient)
+        {
+            return;
+        }
+
+        if (accepted)
+        {
+            RecordAuthorizedShot(shooterActor, shotId);
+        }
+
+        if (PhotonNetwork.LocalPlayer != null && shooterActor == PhotonNetwork.LocalPlayer.ActorNumber)
+        {
+            OnShotResult(shotId, accepted);
+        }
+    }
+
+    private void OnShotResult(int shotId, bool accepted)
+    {
+        if (shotId != pendingShotId)
+        {
+            return;
+        }
+
+        pendingShotId = 0;
+        if (accepted)
+        {
+            Fire(shotId, pendingForward);
+        }
+    }
+
+    private static long ShotKey(int shooterActor, int shotId) => ((long)shooterActor << 32) | (uint)shotId;
+
+    private void RecordAuthorizedShot(int shooterActor, int shotId)
+    {
+        float now = Time.time;
+        var expired = new List<long>();
+        foreach (KeyValuePair<long, float> shot in authorizedShots)
+        {
+            if (now - shot.Value > AuthorizedShotLifetime)
+            {
+                expired.Add(shot.Key);
+            }
+        }
+
+        foreach (long key in expired)
+        {
+            authorizedShots.Remove(key);
+            consumedTargets.Remove(key);
+        }
+
+        authorizedShots[ShotKey(shooterActor, shotId)] = now;
+    }
+
+    /// <summary>
+    /// Receiving end of a hit: true once per target for each shot the host accepted from that sender.
+    /// Offline there is nothing to check.
+    /// </summary>
+    internal bool TryConsumeShot(Photon.Realtime.Player? sender, int shotId, int targetId)
+    {
+        if (!PhotonNetwork.InRoom)
+        {
+            return true;
+        }
+
+        if (sender == null)
+        {
+            return false;
+        }
+
+        long key = ShotKey(sender.ActorNumber, shotId);
+        if (!authorizedShots.ContainsKey(key))
+        {
+            return false;
+        }
+
+        if (!consumedTargets.TryGetValue(key, out HashSet<int> targets))
+        {
+            targets = new HashSet<int>();
+            consumedTargets[key] = targets;
+        }
+
+        return targets.Add(targetId);
     }
 
     private bool HasAmmo()
@@ -58,19 +281,18 @@ public class Action_Gun : ItemAction
         return data.Value < 0 || data.Value > 0;
     }
 
-    private void Fire()
+    /// <summary>Runs on the shooter once the host has accepted the shot and spent the round.</summary>
+    private void Fire(int shotId, Vector3 forward)
     {
-        if (spawnTransform == null)
+        // The round is already spent; a gun put away before the answer arrived just loses the shot.
+        if (spawnTransform == null || character == null || !character.IsLocal)
         {
             return;
         }
 
-        // Host is authoritative for remaining ammo; clients only request a spend.
-        item.photonView.RPC(nameof(Action_Ammo.RequestSpendRPC), RpcTarget.MasterClient);
         OnShoot?.Invoke();
 
         Vector3 origin = spawnTransform.position;
-        Vector3 forward = MainCamera.instance.transform.forward;
         Vector3 right = Vector3.Cross(Vector3.up, forward);
         if (right.sqrMagnitude < 0.001f)
         {
@@ -92,13 +314,13 @@ public class Action_Gun : ItemAction
         {
             Vector2 offset = PelletOffset(i, pelletCount, spread);
             Vector3 direction = (forward + right * offset.x + up * offset.y).normalized;
-            TryPellet(origin, direction, struck);
+            TryPellet(shotId, origin, direction, struck);
         }
 
         photonView.RPC(nameof(RPC_ShotgunBlastFX), RpcTarget.All, origin, forward);
     }
 
-    private void TryPellet(Vector3 origin, Vector3 direction, HashSet<int> struck)
+    private void TryPellet(int shotId, Vector3 origin, Vector3 direction, HashSet<int> struck)
     {
         float distance = maxDistance;
         if (Physics.Raycast(origin, direction, out RaycastHit lineHit, maxDistance, HelperFunctions.terrainMapMask, QueryTriggerInteraction.Ignore))
@@ -130,7 +352,7 @@ public class Action_Gun : ItemAction
                 continue;
             }
 
-            if (!ShotgunCombat.TryHit(candidate.collider, character, this, candidate.point, direction))
+            if (!ShotgunCombat.TryHit(candidate.collider, character, this, shotId, candidate.point, direction))
             {
                 continue;
             }
@@ -141,7 +363,7 @@ public class Action_Gun : ItemAction
     }
 
     [PunRPC]
-    public void RPC_GunImpact(Photon.Realtime.Player? hitPlayer, Vector3 endpoint, Vector3 direction)
+    public void RPC_GunImpact(Photon.Realtime.Player? hitPlayer, Vector3 endpoint, Vector3 direction, int shotId, PhotonMessageInfo info)
     {
         if (hitPlayer == null || !hitPlayer.IsLocal)
         {
@@ -149,6 +371,11 @@ public class Action_Gun : ItemAction
         }
 
         Character local = Character.localCharacter;
+        if (local == null || !TryConsumeShot(info.Sender, shotId, local.photonView.ViewID))
+        {
+            return;
+        }
+
         local.GetComponent<GunCharacterLaunch>().Blast(direction, endpoint);
         if (!ShotgunCombat.FriendlyFire)
         {
@@ -161,11 +388,14 @@ public class Action_Gun : ItemAction
         }
     }
 
-    /// <summary>Host-only: destroy a networked object the shotgun hit (mandrake, spore cloud, etc.).</summary>
+    /// <summary>
+    /// Host-only: apply a hit on a non-character target (spider, beetle, scorpion, mandrake, dynamite, spores)
+    /// after checking the shot was accepted and the room still allows shooting that kind of target.
+    /// </summary>
     [PunRPC]
-    public void RPC_HostDestroyView(int viewId)
+    public void RPC_HostShootTarget(int viewId, int kind, int shotId, PhotonMessageInfo info)
     {
-        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
+        if (!PhotonNetwork.IsMasterClient || !TryConsumeShot(info.Sender, shotId, viewId))
         {
             return;
         }
@@ -173,22 +403,8 @@ public class Action_Gun : ItemAction
         PhotonView? view = PhotonView.Find(viewId);
         if (view != null)
         {
-            PhotonNetwork.Destroy(view.gameObject);
+            ShotgunCombat.HostApply(view, (ShotTargetKind)kind);
         }
-    }
-
-    /// <summary>Host-only: break a spore bomb (<see cref="CloudFungus"/>).</summary>
-    [PunRPC]
-    public void RPC_HostBreakFungus(int viewId)
-    {
-        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
-        {
-            return;
-        }
-
-        PhotonView? view = PhotonView.Find(viewId);
-        CloudFungus? fungus = view != null ? view.GetComponent<CloudFungus>() : null;
-        fungus?.Break();
     }
 
     [PunRPC]

@@ -32,6 +32,12 @@ internal static class ShoreTestSpawns
         while (!spawnedShore || !spawnedAirport)
         {
             yield return wait;
+            // Debug mode can be switched off in the .cfg while this waits for a room or the Shore.
+            if (!Plugin.DebugMode)
+            {
+                yield break;
+            }
+
             if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient || LoadingScreenHandler.loading)
             {
                 continue;

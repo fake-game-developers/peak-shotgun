@@ -1,4 +1,5 @@
 using HarmonyLib;
+using Photon.Pun;
 using UnityEngine;
 
 namespace Peak.Shotgun;
@@ -45,8 +46,7 @@ internal sealed class ShotgunPhysics : MonoBehaviour
             return;
         }
 
-        Transform? visual = transform.Find("ShotgunVisual");
-        ShotgunLuggageRest? luggageRest = visual != null ? visual.GetComponent<ShotgunLuggageRest>() : null;
+        ShotgunLuggageRest? luggageRest = GetComponent<ShotgunLuggageRest>();
         if (luggageRest != null && luggageRest.Armed)
         {
             return;
@@ -73,8 +73,7 @@ internal sealed class ShotgunPhysics : MonoBehaviour
         }
 
         bool held = item.itemState == ItemState.Held || item.holderCharacter != null;
-        Transform? visual = transform.Find("ShotgunVisual");
-        ShotgunLuggageRest? luggageRest = visual != null ? visual.GetComponent<ShotgunLuggageRest>() : null;
+        ShotgunLuggageRest? luggageRest = GetComponent<ShotgunLuggageRest>();
         bool seatedInLuggage = luggageRest != null && luggageRest.Armed;
         int characterMask = CharacterLayerMask();
 
@@ -126,8 +125,16 @@ internal sealed class ShotgunPhysics : MonoBehaviour
         rig.excludeLayers = CharacterLayerMask();
         SetColliders(enabled: true, isTrigger: false);
 
-        float gap = GapAboveTerrain(item);
-        bool nearGround = gap >= -0.05f && gap < 0.08f;
+        // Only the owner settles a ground item. Everyone else's copy is moved by ItemPhysicsSyncer, which ignores
+        // incoming movement while the body is kinematic, so a guest must never freeze or unfreeze on its own:
+        // the owner sends each transition with PEAK's own kinematic RPCs.
+        if (PhotonNetwork.InRoom && item.photonView != null && !item.photonView.IsMine)
+        {
+            return;
+        }
+
+        bool hasGap = TryGetGapAboveTerrain(item, out float gap);
+        bool nearGround = hasGap && gap >= -0.05f && gap < 0.08f;
         bool settled = nearGround
             && groundGrace <= 0f
             && (!rig.isKinematic
@@ -136,10 +143,18 @@ internal sealed class ShotgunPhysics : MonoBehaviour
 
         if (settled)
         {
-            SetKinematicFrozen(rig);
+            bool changed = !rig.isKinematic;
             if (gap < -0.02f)
             {
-                item.transform.position += Vector3.up * (-gap + 0.02f);
+                // Mesh bottom is below the terrain: lift it out so it rests on the surface.
+                item.transform.position += Vector3.up * -gap;
+                changed = true;
+            }
+
+            SetKinematicFrozen(rig);
+            if (changed)
+            {
+                SendKinematic(frozen: true);
             }
 
             return;
@@ -148,10 +163,28 @@ internal sealed class ShotgunPhysics : MonoBehaviour
         if (rig.isKinematic)
         {
             rig.isKinematic = false;
+            SendKinematic(frozen: false);
         }
 
         rig.useGravity = true;
         rig.constraints = RigidbodyConstraints.None;
+    }
+
+    /// <summary>Owner: tell the other clients this ground gun froze (with its resting pose) or started moving again.</summary>
+    private void SendKinematic(bool frozen)
+    {
+        if (item == null || !PhotonNetwork.InRoom || item.photonView == null)
+        {
+            return;
+        }
+
+        Transform root = item.transform;
+        item.photonView.RPC(
+            frozen ? nameof(Item.SetKinematicAndResetSyncData) : nameof(Item.SetKinematicRPC),
+            RpcTarget.Others,
+            frozen,
+            root.position,
+            root.rotation);
     }
 
     /// <summary>
@@ -186,15 +219,16 @@ internal sealed class ShotgunPhysics : MonoBehaviour
     }
 
     /// <summary>
-    /// Signed gap between mesh bottom and terrain: positive = floating, negative = buried, -1 = none.
-    /// Skips the gun's own colliders so we never snap onto ourselves.
+    /// Signed gap between mesh bottom and terrain: positive = floating, negative = buried.
+    /// False when there is no renderer or no terrain below. Skips the gun's own colliders so we never snap onto ourselves.
     /// </summary>
-    private static float GapAboveTerrain(Item item)
+    private static bool TryGetGapAboveTerrain(Item item, out float gap)
     {
+        gap = 0f;
         Renderer? renderer = item.mainRenderer;
         if (renderer == null)
         {
-            return -1f;
+            return false;
         }
 
         Bounds bounds = renderer.bounds;
@@ -226,7 +260,13 @@ internal sealed class ShotgunPhysics : MonoBehaviour
             }
         }
 
-        return found ? bestHitY - bounds.min.y : -1f;
+        if (!found)
+        {
+            return false;
+        }
+
+        gap = bounds.min.y - bestHitY;
+        return true;
     }
 
     private static bool IsOwnCollider(Collider hit, Collider[] self)
@@ -269,6 +309,11 @@ internal static class ShotgunItemStatePatch
         if (__instance.GetComponent<ShotgunInstanceSetup>() == null)
         {
             return;
+        }
+
+        if (__instance.itemState != ItemState.Ground)
+        {
+            __instance.GetComponent<ShotgunLuggageRest>()?.Clear();
         }
 
         if (__instance.itemState != ItemState.InBackpack)

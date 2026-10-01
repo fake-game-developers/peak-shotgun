@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.7
+
+- Host authorizes each shot before it fires, so ammo and hits stay consistent in multiplayer
+- `Shots`, `FriendlyFire`, and every `[Shootables]` toggle come from the host for the whole lobby
+- Roots picks and the per-biome shotgun cap survive quicksave reloads and host migration (`PeakShotgun.loot.json`)
+- Custom runs that disable the shotgun no longer get forced Roots luggage shotguns
+- Remaining ammo updates the correct inventory slot (by gun instance), not just the selected hotbar slot
+- Knocked-down zombies stay silenced for late joiners and after host migration
+- Require PEAKLib Core 1.7.2
+
 ## 1.0.6
 
 - Add `[Shootables]` toggles for zombies, mandrake, beetles, spiders, spores, scorpions, and dynamite (only zombies on by default)

@@ -18,13 +18,16 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
     {
         item = GetComponentInParent<Item>();
         mesh = GetComponent<MeshFilter>()?.sharedMesh;
-        luggageRest = GetComponent<ShotgunLuggageRest>();
+        luggageRest = item != null ? item.GetComponent<ShotgunLuggageRest>() : null;
     }
 
     private void LateUpdate()
     {
         item ??= GetComponentInParent<Item>();
-        luggageRest ??= GetComponent<ShotgunLuggageRest>();
+        if (luggageRest == null && item != null)
+        {
+            luggageRest = item.GetComponent<ShotgunLuggageRest>();
+        }
 
         // Hand anchors were only placed once, when the prefab was built. Re-place them whenever the pose
         // config changes on disk so Right / Down / Forward / ToeIn apply to the hands live, not just the mesh.
@@ -42,7 +45,7 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
 
         if (held && luggageRest != null)
         {
-            luggageRest.Armed = false;
+            luggageRest.Clear();
         }
 
         bool justHeld = held && lastHeld != true;

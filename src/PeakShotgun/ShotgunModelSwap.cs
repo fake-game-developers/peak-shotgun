@@ -67,6 +67,7 @@ internal static class ShotgunModelSwap
 
         gunObject.AddComponent<ShotgunInstanceSetup>();
         gunObject.AddComponent<ShotgunPhysics>();
+        gunObject.AddComponent<ShotgunLuggageRest>();
 
         Plugin.Log.LogInfo(
             $"Applied custom shotgun mesh (scale={Plugin.ModelScale:0.###}, shader={renderer.sharedMaterial?.shader?.name}, albedo={(albedo != null ? $"{albedo.width}x{albedo.height}" : "null")}).");
@@ -377,56 +378,107 @@ internal static class ShotgunModelSwap
         (0.76f, 1f),
     ];
 
+    private static Mesh? layoutMesh;
+    private static Bounds[]? layoutBoxes;
+
+    /// <summary>
+    /// Fits the collision boxes to the mesh, reusing the boxes already on the visual. Instances inherit the
+    /// prefab's boxes, so after the first fit this only rewrites bounds. PEAK's <c>Item.Awake</c> registers
+    /// every collider in <c>Item.COLLIDER_TO_ITEM</c> (and the held-item interaction raycast relies on it), so any
+    /// collider added or removed after that is registered / unregistered here too.
+    /// </summary>
     internal static void RefitColliders(GameObject gunObject, GameObject visual, Mesh mesh)
     {
+        Bounds[] layout = ColliderLayout(mesh);
+        Item? item = gunObject.GetComponent<Item>();
+        // Registering before Item.Awake would make its RegisterItem throw on the duplicate key.
+        bool registered = item != null && Item.ALL_ITEMS.Contains(item);
+
+        var kept = new HashSet<Collider>();
+        BoxCollider[] existing = visual.GetComponents<BoxCollider>();
+        for (int i = 0; i < layout.Length; i++)
+        {
+            BoxCollider box;
+            if (i < existing.Length)
+            {
+                box = existing[i];
+            }
+            else
+            {
+                box = visual.AddComponent<BoxCollider>();
+                box.isTrigger = false;
+            }
+
+            box.center = layout[i].center;
+            box.size = layout[i].size;
+            kept.Add(box);
+        }
+
         foreach (Collider collider in gunObject.GetComponentsInChildren<Collider>(true))
         {
+            if (kept.Contains(collider))
+            {
+                continue;
+            }
+
+            if (registered
+                && Item.COLLIDER_TO_ITEM.TryGetValue(collider, out Item owner)
+                && owner == item)
+            {
+                Item.COLLIDER_TO_ITEM.Remove(collider);
+            }
+
             UnityEngine.Object.DestroyImmediate(collider);
         }
 
+        if (item == null)
+        {
+            return;
+        }
+
+        item.colliders = gunObject.GetComponentsInChildren<Collider>(true);
+        if (registered)
+        {
+            foreach (Collider collider in item.colliders)
+            {
+                Item.COLLIDER_TO_ITEM[collider] = item;
+            }
+        }
+    }
+
+    private static Bounds[] ColliderLayout(Mesh mesh)
+    {
+        if (layoutMesh == mesh && layoutBoxes != null)
+        {
+            return layoutBoxes;
+        }
+
+        var boxes = new List<Bounds>();
         Vector3[] vertices = mesh.vertices;
         Bounds barrel = mesh.bounds;
         float xMin = barrel.min.x;
         float xSpan = barrel.max.x - xMin;
-        if (xSpan < 1e-5f || vertices.Length == 0)
-        {
-            AddFallbackBox(visual, barrel);
-        }
-        else
+        if (xSpan >= 1e-5f && vertices.Length > 0)
         {
             foreach ((float t0, float t1) in CollisionSegments)
             {
                 float x0 = xMin + xSpan * t0;
                 float x1 = xMin + xSpan * t1;
-                if (!TryBoundsAlongBarrel(vertices, x0, x1, out Bounds segment))
+                if (TryBoundsAlongBarrel(vertices, x0, x1, out Bounds segment))
                 {
-                    continue;
+                    boxes.Add(new Bounds(segment.center, Vector3.Max(segment.size, new Vector3(0.02f, 0.02f, 0.02f))));
                 }
-
-                var box = visual.AddComponent<BoxCollider>();
-                box.center = segment.center;
-                box.size = Vector3.Max(segment.size, new Vector3(0.02f, 0.02f, 0.02f));
-                box.isTrigger = false;
             }
         }
 
-        if (visual.GetComponents<BoxCollider>().Length == 0)
+        if (boxes.Count == 0)
         {
-            AddFallbackBox(visual, mesh.bounds);
+            boxes.Add(new Bounds(barrel.center, Vector3.Max(barrel.size, new Vector3(0.05f, 0.05f, 0.05f))));
         }
 
-        if (gunObject.TryGetComponent(out Item item))
-        {
-            item.colliders = gunObject.GetComponentsInChildren<Collider>(true);
-        }
-    }
-
-    private static void AddFallbackBox(GameObject visual, Bounds local)
-    {
-        var box = visual.AddComponent<BoxCollider>();
-        box.center = local.center;
-        box.size = Vector3.Max(local.size, new Vector3(0.05f, 0.05f, 0.05f));
-        box.isTrigger = false;
+        layoutMesh = mesh;
+        layoutBoxes = boxes.ToArray();
+        return layoutBoxes;
     }
 
     private static bool TryBoundsAlongBarrel(Vector3[] vertices, float x0, float x1, out Bounds bounds)

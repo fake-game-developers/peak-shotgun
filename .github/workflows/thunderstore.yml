@@ -17,10 +17,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Peak.Shotgun.slnx needs a .NET 10 SDK; global.json pins the band so the build does not depend
+      # on whatever newer SDK the runner image happens to ship.
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          global-json-file: global.json
+
+      - name: Check Thunderstore dependencies match the build
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import re, sys, tomllib
+          csproj = open("src/PeakShotgun/Peak.Shotgun.csproj", encoding="utf-8").read()
+          built = dict(re.findall(r'<PackageReference Include="PEAKModding\.(PEAKLib\.\w+)" Version="([^"]+)"', csproj))
+          with open("src/PeakShotgun/thunderstore.toml", "rb") as f:
+              declared = tomllib.load(f)["package"]["dependencies"]
+          bad = False
+          for lib, version in built.items():
+              key = "PEAKModding-" + lib.replace(".", "_")
+              if declared.get(key) != version:
+                  print(f"{key}: thunderstore.toml declares {declared.get(key)!r}, csproj builds against {version!r}")
+                  bad = True
+          sys.exit(1 if bad else 0)
+          EOF
 
       - name: Download FakeGameDevelopers.PEAKGameLibs (CI refs)
         run: |
@@ -72,17 +92,50 @@ jobs:
 
           # Publish when the csproj version is not yet the live Thunderstore release.
           # Comparing only to the previous git commit misses bumps made while CI was red.
-          live=$(curl -fsSL -A "peak-shotgun" "https://thunderstore.io/api/experimental/package/FakeGameDevelopers/PeakShotgun/" \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["latest"]["version_number"])' \
-            || true)
-          echo "Live Thunderstore version: ${live:-<none>}"
+          # Only a confirmed 404 counts as "never published"; any other failure stops the job.
+          url="https://thunderstore.io/api/experimental/package/FakeGameDevelopers/PeakShotgun/"
+          status=000
+          for attempt in 1 2 3; do
+            if ! status=$(curl -sS -A "peak-shotgun" --max-time 30 -o live.json -w '%{http_code}' "$url"); then
+              status=000
+            fi
+            case "$status" in
+              200|404) break ;;
+            esac
+            echo "Thunderstore lookup attempt $attempt returned HTTP $status."
+            sleep $((attempt * 10))
+          done
 
-          if [ -n "$live" ] && [ "$version" = "$live" ]; then
-            echo "Version $version is already the live Thunderstore release."
-            publish=false
-          else
-            publish=true
-          fi
+          case "$status" in
+            404)
+              echo "No Thunderstore package yet; this is the first release."
+              publish=true
+              ;;
+            200)
+              # Anything but a semantic "x.y.z" string (null, number, missing key, bad JSON) stops the job.
+              if ! live=$(python3 -c '
+          import json, re, sys
+          v = json.load(open("live.json"))["latest"]["version_number"]
+          if not isinstance(v, str) or not re.fullmatch(r"\d+\.\d+\.\d+", v):
+              sys.exit(1)
+          print(v)
+          '); then
+                echo "Thunderstore response has no valid latest version; not deciding to publish."
+                exit 1
+              fi
+              echo "Live Thunderstore version: $live"
+              if [ "$version" = "$live" ]; then
+                echo "Version $version is already the live Thunderstore release."
+                publish=false
+              else
+                publish=true
+              fi
+              ;;
+            *)
+              echo "Could not look up the live Thunderstore release (HTTP $status); not deciding to publish."
+              exit 1
+              ;;
+          esac
 
           echo "Version $version; publish=$publish"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"

@@ -7,8 +7,36 @@ using UnityEngine;
 
 namespace Peak.Shotgun;
 
+/// <summary>Shootable target toggles, packed so the host can publish them as one room property.</summary>
+[Flags]
+internal enum ShootTargets
+{
+    None = 0,
+    Zombies = 1 << 0,
+    Mandrake = 1 << 1,
+    Beetles = 1 << 2,
+    Spiders = 1 << 3,
+    Spores = 1 << 4,
+    Scorpions = 1 << 5,
+    Dynamite = 1 << 6,
+}
+
+/// <summary>Non-character targets, as sent to the host in <see cref="Action_Gun.RPC_HostShootTarget"/>.</summary>
+internal enum ShotTargetKind
+{
+    Spider = 1,
+    Beetle = 2,
+    Scorpion = 3,
+    Mandrake = 4,
+    Dynamite = 5,
+    SporeBomb = 6,
+    SporeCloud = 7,
+}
+
 /// <summary>
 /// Config + hit resolution for what the shotgun can affect (creatures, hazards, friendly fire).
+/// In multiplayer the rules come from the host (<see cref="HostConfigSync"/>), not from each client's config,
+/// and the host applies every non-character hit after re-checking them.
 /// </summary>
 internal static class ShotgunCombat
 {
@@ -24,21 +52,47 @@ internal static class ShotgunCombat
     private static PropertyInfo? mobStateProperty;
     private static object? mobStateDead;
 
-    internal static bool FriendlyFire => friendlyFire?.Value ?? true;
+    /// <summary>This client's own <c>FriendlyFire</c> config (the host publishes it; clients use the host's).</summary>
+    internal static bool LocalFriendlyFire => friendlyFire?.Value ?? true;
 
-    internal static bool CanShootZombies => shootZombies?.Value ?? true;
+    /// <summary>This client's own <c>[Shootables]</c> config (the host publishes it; clients use the host's).</summary>
+    internal static ShootTargets LocalShootables =>
+        (shootZombies?.Value ?? true ? ShootTargets.Zombies : ShootTargets.None)
+        | (shootMandrake?.Value ?? false ? ShootTargets.Mandrake : ShootTargets.None)
+        | (shootBeetles?.Value ?? false ? ShootTargets.Beetles : ShootTargets.None)
+        | (shootSpiders?.Value ?? false ? ShootTargets.Spiders : ShootTargets.None)
+        | (shootSpores?.Value ?? false ? ShootTargets.Spores : ShootTargets.None)
+        | (shootScorpions?.Value ?? false ? ShootTargets.Scorpions : ShootTargets.None)
+        | (shootDynamite?.Value ?? false ? ShootTargets.Dynamite : ShootTargets.None);
 
-    internal static bool CanShootMandrake => shootMandrake?.Value ?? false;
+    internal static bool FriendlyFire => HostConfigSync.FriendlyFire;
 
-    internal static bool CanShootBeetles => shootBeetles?.Value ?? false;
+    internal static bool CanShootZombies => Allows(ShootTargets.Zombies);
 
-    internal static bool CanShootSpiders => shootSpiders?.Value ?? false;
+    internal static bool CanShootMandrake => Allows(ShootTargets.Mandrake);
 
-    internal static bool CanShootSpores => shootSpores?.Value ?? false;
+    internal static bool CanShootBeetles => Allows(ShootTargets.Beetles);
 
-    internal static bool CanShootScorpions => shootScorpions?.Value ?? false;
+    internal static bool CanShootSpiders => Allows(ShootTargets.Spiders);
 
-    internal static bool CanShootDynamite => shootDynamite?.Value ?? false;
+    internal static bool CanShootSpores => Allows(ShootTargets.Spores);
+
+    internal static bool CanShootScorpions => Allows(ShootTargets.Scorpions);
+
+    internal static bool CanShootDynamite => Allows(ShootTargets.Dynamite);
+
+    private static bool Allows(ShootTargets target) => (HostConfigSync.Shootables & target) != 0;
+
+    private static bool Allows(ShotTargetKind kind) => kind switch
+    {
+        ShotTargetKind.Spider => CanShootSpiders,
+        ShotTargetKind.Beetle => CanShootBeetles,
+        ShotTargetKind.Scorpion => CanShootScorpions,
+        ShotTargetKind.Mandrake => CanShootMandrake,
+        ShotTargetKind.Dynamite => CanShootDynamite,
+        ShotTargetKind.SporeBomb or ShotTargetKind.SporeCloud => CanShootSpores,
+        _ => false,
+    };
 
     internal static void Bind(ConfigFile config)
     {
@@ -46,25 +100,26 @@ internal static class ShotgunCombat
             "Combat",
             "FriendlyFire",
             true,
-            "If true, shotguns injure other scouts. If false, hits still ragdoll / shove them but deal no Injury.");
+            "If true, shotguns injure other scouts. If false, hits still ragdoll / shove them but deal no Injury. Host's value is used in multiplayer.");
 
-        shootZombies = config.Bind("Shootables", "Zombies", true, "Shotguns can hit and knock down zombies.");
-        shootMandrake = config.Bind("Shootables", "Mandrake", false, "Shotguns can destroy mandrakes.");
-        shootBeetles = config.Bind("Shootables", "Beetles", false, "Shotguns can kill beetles.");
-        shootSpiders = config.Bind("Shootables", "Spiders", false, "Shotguns can stun spiders (same as throwing an item at them).");
-        shootSpores = config.Bind("Shootables", "Spores", false, "Shotguns can break spore bombs and clear spore clouds.");
-        shootScorpions = config.Bind("Shootables", "Scorpions", false, "Shotguns can kill scorpions.");
-        shootDynamite = config.Bind("Shootables", "Dynamite", false, "Shotguns can light dynamite fuses.");
+        shootZombies = config.Bind("Shootables", "Zombies", true, "Shotguns can hit and knock down zombies. Host's value is used in multiplayer.");
+        shootMandrake = config.Bind("Shootables", "Mandrake", false, "Shotguns can destroy mandrakes. Host's value is used in multiplayer.");
+        shootBeetles = config.Bind("Shootables", "Beetles", false, "Shotguns can kill beetles. Host's value is used in multiplayer.");
+        shootSpiders = config.Bind("Shootables", "Spiders", false, "Shotguns can stun spiders (same as throwing an item at them). Host's value is used in multiplayer.");
+        shootSpores = config.Bind("Shootables", "Spores", false, "Shotguns can break spore bombs and clear spore clouds. Host's value is used in multiplayer.");
+        shootScorpions = config.Bind("Shootables", "Scorpions", false, "Shotguns can kill scorpions. Host's value is used in multiplayer.");
+        shootDynamite = config.Bind("Shootables", "Dynamite", false, "Shotguns can light dynamite fuses. Host's value is used in multiplayer.");
     }
 
     /// <summary>
-    /// Applies the shotgun hit to whatever is under the collider, if that target is enabled in config.
+    /// Applies the shotgun hit to whatever is under the collider, if that target is enabled.
     /// Returns true when a target was handled (so the pellet should not also hit something else).
     /// </summary>
     internal static bool TryHit(
         Collider collider,
         Character? shooter,
         Action_Gun gun,
+        int shotId,
         Vector3 hitPoint,
         Vector3 direction)
     {
@@ -76,92 +131,188 @@ internal static class ShotgunCombat
         Character? character = collider.GetComponentInParent<Character>();
         if (character != null && character != shooter)
         {
-            return TryHitCharacter(character, gun, hitPoint, direction);
+            return TryHitCharacter(character, gun, shotId, hitPoint, direction);
         }
+
+        if (!TryClassify(collider, out Component? target, out ShotTargetKind kind))
+        {
+            return false;
+        }
+
+        PhotonView? view = ViewOf(target);
+        if (!PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient || view == null)
+        {
+            Apply(target, kind, view);
+        }
+        else
+        {
+            gun.photonView.RPC(nameof(Action_Gun.RPC_HostShootTarget), RpcTarget.MasterClient, view.ViewID, (int)kind, shotId);
+        }
+
+        return true;
+    }
+
+    /// <summary>Finds the first enabled target type under the collider, in priority order.</summary>
+    private static bool TryClassify(Collider collider, out Component target, out ShotTargetKind kind)
+    {
+        target = null!;
+        kind = default;
 
         if (CanShootSpiders)
         {
             Spider? spider = collider.GetComponentInParent<Spider>();
+            if (spider == null)
+            {
+                SpiderTrigger? trigger = collider.GetComponentInParent<SpiderTrigger>();
+                spider = trigger != null ? trigger.spider : null;
+            }
+
             if (spider != null)
             {
-                spider.Bonk();
-                return true;
-            }
-
-            SpiderTrigger? trigger = collider.GetComponentInParent<SpiderTrigger>();
-            if (trigger != null)
-            {
-                trigger.Bonk();
-                return true;
+                return Found(spider, ShotTargetKind.Spider, out target, out kind);
             }
         }
 
-        if (CanShootBeetles)
+        if (CanShootBeetles && collider.GetComponentInParent<Beetle>() is { } beetle)
         {
-            Beetle? beetle = collider.GetComponentInParent<Beetle>();
-            if (beetle != null)
-            {
-                KillMob(beetle);
-                return true;
-            }
+            return Found(beetle, ShotTargetKind.Beetle, out target, out kind);
         }
 
-        if (CanShootScorpions)
+        if (CanShootScorpions && collider.GetComponentInParent<Scorpion>() is { } scorpion)
         {
-            Scorpion? scorpion = collider.GetComponentInParent<Scorpion>();
-            if (scorpion != null)
-            {
-                KillMob(scorpion);
-                return true;
-            }
+            return Found(scorpion, ShotTargetKind.Scorpion, out target, out kind);
         }
 
-        if (CanShootMandrake)
+        if (CanShootMandrake && collider.GetComponentInParent<Mandrake>() is { } mandrake)
         {
-            Mandrake? mandrake = collider.GetComponentInParent<Mandrake>();
-            if (mandrake != null)
-            {
-                Item? mandrakeItem = mandrake.item != null ? mandrake.item : mandrake.GetComponent<Item>();
-                if (mandrakeItem != null)
-                {
-                    RequestHostDestroy(gun, mandrakeItem.gameObject);
-                }
-
-                return true;
-            }
+            return Found(mandrake, ShotTargetKind.Mandrake, out target, out kind);
         }
 
-        if (CanShootDynamite)
+        if (CanShootDynamite && collider.GetComponentInParent<Dynamite>() is { } dynamite)
         {
-            Dynamite? dynamite = collider.GetComponentInParent<Dynamite>();
-            if (dynamite != null)
-            {
-                dynamite.LightFlare();
-                return true;
-            }
+            return Found(dynamite, ShotTargetKind.Dynamite, out target, out kind);
         }
 
         if (CanShootSpores)
         {
-            CloudFungus? fungus = collider.GetComponentInParent<CloudFungus>();
-            if (fungus != null)
+            if (collider.GetComponentInParent<CloudFungus>() is { } fungus)
             {
-                RequestHostBreakFungus(gun, fungus);
-                return true;
+                return Found(fungus, ShotTargetKind.SporeBomb, out target, out kind);
             }
 
             StatusEmitter? emitter = collider.GetComponentInParent<StatusEmitter>();
-            if (emitter != null && emitter.statusType == CharacterAfflictions.STATUSTYPE.Spores)
+            if (IsSporeCloud(emitter))
             {
-                RequestHostDestroy(gun, emitter.gameObject);
-                return true;
+                return Found(emitter!, ShotTargetKind.SporeCloud, out target, out kind);
             }
         }
 
         return false;
     }
 
-    private static bool TryHitCharacter(Character character, Action_Gun gun, Vector3 hitPoint, Vector3 direction)
+    private static bool Found(Component component, ShotTargetKind found, out Component target, out ShotTargetKind kind)
+    {
+        target = component;
+        kind = found;
+        return true;
+    }
+
+    private static bool IsSporeCloud(StatusEmitter? emitter) =>
+        emitter != null && emitter.statusType == CharacterAfflictions.STATUSTYPE.Spores;
+
+    /// <summary>
+    /// Host side of <see cref="Action_Gun.RPC_HostShootTarget"/>: find the claimed target under the view and apply
+    /// it only if it really is that kind of target and the room allows shooting it.
+    /// </summary>
+    internal static void HostApply(PhotonView view, ShotTargetKind kind)
+    {
+        GameObject root = view.gameObject;
+        Component? target = kind switch
+        {
+            ShotTargetKind.Spider => Near<Spider>(root),
+            ShotTargetKind.Beetle => Near<Beetle>(root),
+            ShotTargetKind.Scorpion => Near<Scorpion>(root),
+            ShotTargetKind.Mandrake => Near<Mandrake>(root),
+            ShotTargetKind.Dynamite => Near<Dynamite>(root),
+            ShotTargetKind.SporeBomb => Near<CloudFungus>(root),
+            ShotTargetKind.SporeCloud => Near<StatusEmitter>(root) is { } emitter && IsSporeCloud(emitter) ? emitter : null,
+            _ => null,
+        };
+
+        // The view must be the target's own, so a forged id cannot destroy some larger object that merely
+        // contains a mandrake or spore emitter.
+        if (target != null && ViewOf(target) == view)
+        {
+            Apply(target, kind, view);
+        }
+    }
+
+    private static PhotonView? ViewOf(Component target) =>
+        target is Spider spider && spider.photonView != null
+            ? spider.photonView
+            : target.GetComponentInParent<PhotonView>();
+
+    private static T? Near<T>(GameObject root)
+        where T : Component
+    {
+        T? below = root.GetComponentInChildren<T>(true);
+        return below != null ? below : root.GetComponentInParent<T>();
+    }
+
+    /// <summary>Runs on the host (or offline, or for a target with no network view).</summary>
+    private static void Apply(Component target, ShotTargetKind kind, PhotonView? view)
+    {
+        if (!Allows(kind))
+        {
+            return;
+        }
+
+        switch (kind)
+        {
+            case ShotTargetKind.Spider:
+                ((Spider)target).Bonk();
+                break;
+            case ShotTargetKind.Beetle:
+            case ShotTargetKind.Scorpion:
+                KillMob((Mob)target);
+                break;
+            case ShotTargetKind.Dynamite:
+                ((Dynamite)target).LightFlare();
+                break;
+            case ShotTargetKind.SporeBomb:
+                ((CloudFungus)target).Break();
+                break;
+            case ShotTargetKind.Mandrake:
+            case ShotTargetKind.SporeCloud:
+                if (view != null)
+                {
+                    PhotonNetwork.Destroy(view.gameObject);
+                }
+                else
+                {
+                    UnityEngine.Object.Destroy(MandrakeOrEmitterRoot(target, kind));
+                }
+
+                break;
+        }
+    }
+
+    private static GameObject MandrakeOrEmitterRoot(Component target, ShotTargetKind kind)
+    {
+        if (kind == ShotTargetKind.Mandrake)
+        {
+            Mandrake mandrake = (Mandrake)target;
+            Item? item = mandrake.item != null ? mandrake.item : mandrake.GetComponent<Item>();
+            if (item != null)
+            {
+                return item.gameObject;
+            }
+        }
+
+        return target.gameObject;
+    }
+
+    private static bool TryHitCharacter(Character character, Action_Gun gun, int shotId, Vector3 hitPoint, Vector3 direction)
     {
         if (GunCharacterLaunch.IsZombie(character))
         {
@@ -177,21 +328,48 @@ internal static class ShotgunCombat
             }
             else
             {
-                character.photonView.RPC(nameof(GunCharacterLaunch.RPC_ShotgunBlast), RpcTarget.All, direction, hitPoint);
+                character.photonView.RPC(
+                    nameof(GunCharacterLaunch.RPC_ShotgunBlast),
+                    character.photonView.Owner,
+                    direction,
+                    hitPoint,
+                    gun.photonView.ViewID,
+                    shotId);
             }
 
             return true;
         }
 
         // Scouts: always impact; Injury only when FriendlyFire is on.
-        gun.photonView.RPC(nameof(Action_Gun.RPC_GunImpact), RpcTarget.All, character.photonView.Owner, hitPoint, direction);
+        gun.photonView.RPC(nameof(Action_Gun.RPC_GunImpact), RpcTarget.All, character.photonView.Owner, hitPoint, direction, shotId);
         return true;
     }
 
+    /// <summary>
+    /// Mob state is owned by the mob's owner (its setter only syncs from there), so a host that does not own
+    /// the mob asks the owner to switch it to Dead.
+    /// </summary>
     private static void KillMob(Mob mob)
     {
         if (mob == null)
         {
+            return;
+        }
+
+        PhotonView? view = mob.photonView;
+        bool networked = PhotonNetwork.InRoom && view != null && view.ViewID != 0;
+        if (networked && !view!.IsMine)
+        {
+            // Dead = 3 on Mob.MobState; mirrors cooking a scorpion/beetle.
+            if (view.Owner != null)
+            {
+                view.RPC("RPC_SyncMobState", view.Owner, 3);
+            }
+            else
+            {
+                view.RPC("RPC_SyncMobState", RpcTarget.All, 3);
+            }
+
             return;
         }
 
@@ -200,18 +378,13 @@ internal static class ShotgunCombat
         {
             try
             {
+                // On the owner the setter also sends RPC_SyncMobState to everyone else.
                 mobStateProperty.SetValue(mob, mobStateDead);
             }
             catch (Exception e)
             {
                 Plugin.Log.LogWarning($"Could not kill mob '{mob.name}': {e.Message}");
             }
-        }
-
-        if (mob.photonView != null && mob.photonView.ViewID != 0)
-        {
-            // Dead = 3 on Mob.MobState; mirrors cooking a scorpion/beetle.
-            mob.photonView.RPC("RPC_SyncMobState", RpcTarget.All, 3);
         }
 
         Rigidbody? rig = mob.GetComponent<Rigidbody>();
@@ -235,41 +408,5 @@ internal static class ShotgunCombat
         {
             mobStateDead = Enum.Parse(stateType, "Dead");
         }
-    }
-
-    private static void RequestHostDestroy(Action_Gun gun, GameObject target)
-    {
-        PhotonView? view = target.GetComponent<PhotonView>() ?? target.GetComponentInParent<PhotonView>();
-        if (view == null)
-        {
-            UnityEngine.Object.Destroy(target);
-            return;
-        }
-
-        if (!PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient || view.IsMine)
-        {
-            PhotonNetwork.Destroy(view.gameObject);
-            return;
-        }
-
-        gun.photonView.RPC(nameof(Action_Gun.RPC_HostDestroyView), RpcTarget.MasterClient, view.ViewID);
-    }
-
-    private static void RequestHostBreakFungus(Action_Gun gun, CloudFungus fungus)
-    {
-        PhotonView? view = fungus.GetComponent<PhotonView>();
-        if (view == null)
-        {
-            fungus.Break();
-            return;
-        }
-
-        if (!PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient || view.IsMine)
-        {
-            fungus.Break();
-            return;
-        }
-
-        gun.photonView.RPC(nameof(Action_Gun.RPC_HostBreakFungus), RpcTarget.MasterClient, view.ViewID);
     }
 }

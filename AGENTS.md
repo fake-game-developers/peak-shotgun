@@ -33,20 +33,25 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 | Type | Role |
 |---|---|
 | `Plugin` | Builds the shotgun prefab, loads the icon and shot sound, sets `item.totalUses` from config |
-| `Action_Gun` | Primary fire. Pellet cone, hit detection, shot sound, and the blast RPC |
-| `Action_Ammo` | `ReduceUsesRPC` lowers `ItemUses` and the fuel bar. At zero the gun stops firing. The empty gun stays in hand |
+| `Action_Gun` | Primary fire. Shot request to the host, pellet cone, hit detection, shot sound, and the blast RPC |
+| `Action_Ammo` | Host-only `TrySpendOne` lowers `ItemUses` and broadcasts it with `ApplyUsesRPC` (also the fuel bar). Clients accept `ApplyUsesRPC` only from the host, and write the count into the inventory slot whose instance-data guid matches the gun (never the currently selected slot). At zero the gun stops firing. The empty gun stays in hand |
+| `HostConfigSync` | Publishes the host's `Shots`, `FriendlyFire` and `[Shootables]` as Photon room properties; every client reads those instead of its own config |
 | `ShotgunAmmoUI` | Appends the remaining count to the hotbar name (`Item.GetItemName`) and the shoot prompt (`GUIManager.GetMainInteractPrompt`), then refreshes both after a shot |
 | `ShotgunVFX` | A short orange point light, plus a small copy of a smoke effect already in PEAK |
 | `GunPatch` | Adds `GunCharacterLaunch` to every character in `Character.Awake` |
-| `GunCharacterLaunch` | Knockback and zombie knockdown. Owner-only physics. `Silenced` is set on the knockdown |
+| `GunCharacterLaunch` | Knockback and zombie knockdown. Owner-only physics. The owner mirrors the zombie's hit count and knockdown to everyone (`RPC_ZombieShotState`, replayed to late joiners), which also sets `Silenced` |
 | `ZombieSilencePatch` | Stops a knocked-down zombie from playing its own sounds |
 | `ItemDatabasePatch` | Calls `CreateFromBlowgun` when `ItemDatabase.OnLoaded` finishes |
-| `RootsLuggagePatch` | Always marks 2 random Roots suitcases per run and forces a shotgun into those. `CanSpawnOnAnyBiome` (default false) also allows random rolls in other biomes' luggage |
+| `RootsLuggagePatch` | Always marks 2 random Roots suitcases per run and forces a shotgun into those (only when `Item.IsValidToSpawn`, so custom-run exclusions apply). `CanSpawnOnAnyBiome` (default false) also allows random rolls in other biomes' luggage. At the per-biome cap the shotgun becomes an invalid roll and extra shotguns are re-rolled as other loot (same pool, `canRepeat` and fallback item as the original roll). Picks and counts live in `ShotgunLootLedger` |
+| `ShotgunLootLedger` | Per-run loot bookkeeping keyed by `RunManager.RunId` and a stable suitcase key (scene + scene view id): the marked Roots suitcases, shotguns per suitcase per biome, and each seat pose. The host publishes it as room property `PeakShotgun_Loot` and saves it to `BepInEx/config/PeakShotgun.loot.json` (last 20 runs), so quicksave reloads and host migration keep it. A re-rolled suitcase replaces its own count; a gun restored from save history counts too |
+| `ShotgunLuggageRest` | Luggage-only visual pose and freeze, on the item root. The host arms it in `Luggage.OffsetSpawn` (for saved loot, from the pose in `ShotgunLootLedger` in `Spawner.InitializePhysics`), sends it to the others, and replays it to late joiners |
 | `ShoreTestSpawns` | Only with `[Debug] EnableDebugMode` (default off): the host spawns a shotgun and luggage at the Airport, and three zombies and one shotgun near the local player once per Shore load |
 
 ### Shot
 
-`Action_Gun.Fire` spends one use and raycasts `pelletCount` pellets (default 8) inside `spread`. One character is damaged once per shot. Scouts get the afflictions on `Action_Gun` (Injury). Zombies do not: Injury does not affect them, so zombie hits go to `GunCharacterLaunch` instead.
+`Action_Gun.RunAction` sends `RPC_RequestShot` with a shot id to the host and waits; only one request is outstanding at a time, and an unanswered one is re-sent with the same id every 1.5 s while fire is held. The host checks that the sender holds the gun, the fire-rate cooldown (by send time, with jitter slack) and the magazine, spends one use, and remembers its answer per sender: a retry of the same id gets the same answer without spending again, older ids are ignored. Accepted shots are announced to everyone (`RPC_ShotResult`, `RpcTarget.All`) so every client knows which shooter + shot id the host paid for; rejections go only to the shooter. Only on acceptance does `Action_Gun.Fire` run on the shooter: recoil, pellets, hit RPCs and the blast FX. A rejected shot does nothing.
+
+Every hit RPC carries the shot id, and the receiver checks it with `Action_Gun.TryConsumeShot` (accepted by the host, from that shooter, at most once per target, valid 10 s): `RPC_GunImpact` on the hit scout, `GunCharacterLaunch.RPC_ShotgunBlast` on the zombie's owner, and `RPC_HostShootTarget` on the host. Spiders, beetles, scorpions, mandrakes, dynamite and spores are applied only by the host (`ShotgunCombat.HostApply`), after re-checking the room's `[Shootables]` and that the view id really belongs to that kind of target. Mob state is owner-authoritative, so the host asks a mob's owner to set it to Dead. `Fire` raycasts `pelletCount` pellets (default 8) inside `spread`. One character is damaged once per shot. Scouts get the afflictions on `Action_Gun` (Injury). Zombies do not: Injury does not affect them, so zombie hits go to `GunCharacterLaunch` instead.
 
 `RPC_ShotgunBlastFX` runs on every client. It plays `shotSFX` at the muzzle, flashes `ShotgunVFX` and shakes the camera. The shot sound must stay in this RPC: played from `Fire` only the shooter hears it. It does not spawn the blowgun dart puff. `ShotgunVFX.Play` puts the flash and smoke at that client's own `ShotgunMuzzle` and points them along it. `ShotgunMuzzle` sits at the centre of the barrel-end mesh slice (`Plugin.UpdateMeshAnchors`) with its forward along the barrel. Pellets start there but fly along the shooter's camera forward.
 
@@ -60,15 +65,17 @@ Recoil is `[Shotgun] EnableRecoil` (default true) and `[Shotgun] Recoil` (streng
 
 `GunCharacterLaunch` looks up `MushroomZombie` by name because the mod does not reference that type directly.
 
-A hit calls `Character.Fall` and then `Character.AddForce` for `ShoveSeconds` (0.3s) at `ShoveAcceleration` (36). That is one acceleration on the body. Do not switch this to `AddForceAtPosition`. PEAK applies that impulse to every ragdoll bone, which launches the zombie off the map.
+A hit calls `Character.Fall` and then `Character.AddForce` once per physics step (`FixedUpdate`) for `ShoveSeconds` (0.3s) at `ShoveAcceleration` (36). Bodypart forces accumulate until the next physics step, so adding it per rendered frame would scale the shove with frame rate. That is one acceleration on the body. Do not switch this to `AddForceAtPosition`. PEAK applies that impulse to every ragdoll bone, which launches the zombie off the map.
 
 The first zombie hit adds Drowsy (0.5) and does not knock them out. The second hit calls `PassOutInstantly` and `HoldDown`. `LateUpdate` keeps them down (`passedOut`, `fullyPassedOut`, Drowsy at 1, `fallSeconds` at least 5) so lunge recovery cannot stand them back up. The game still does not mark them `Dead`. PEAK's own downed timer kills them later.
 
-`KnockDown` sends `RPC_SilenceZombie` to every client. That sets `Silenced`, stops `AudioSource`s on the zombie, and mutes them. `ZombieSilencePatch` is a Harmony prefix on `MushroomZombie.RPC_PlaySFX`. If `Silenced` is set, the prefix skips the original method, which blocks later grunts, the knockout bark, and bite sounds. `Prepare` skips the patch when that method is missing, so a game update does not fail plugin load.
+`KnockDown` silences the zombie and sends the knockdown with `RPC_ZombieShotState`. That sets `Silenced` on every client, stops `AudioSource`s on the zombie, and mutes them. `ZombieSilencePatch` is a Harmony prefix on `MushroomZombie.RPC_PlaySFX`. If `Silenced` is set, the prefix skips the original method, which blocks later grunts, the knockout bark, and bite sounds. `Prepare` skips the patch when that method is missing, so a game update does not fail plugin load.
 
 ### Held pose (do not freeze the rigidbody)
 
 PEAK does not parent a held item to the hand. `CharacterItems.HoldItem` adds force and torque to the item's dynamic rigidbody every `FixedUpdate` to pull it to the hold pose and rotate it to the look direction. `AttachItem` joins the scout's `Hand_R` and `Hand_L` bones to that rigidbody. So a held item must stay non-kinematic with `constraints = None` (`ShotgunPhysics.Apply`). A kinematic or `FreezeAll` gun stays fixed in the world and pins the scout in mid-air. Only the luggage, ground and backpack states may freeze it.
+
+A ground gun is settled only by its owner: once it rests on the terrain the owner freezes it (lifting it out of the terrain if needed) and sends `Item.SetKinematicAndResetSyncData` to the others, and sends `Item.SetKinematicRPC(false)` when it starts moving again. Other clients never freeze or unfreeze it themselves, because `ItemPhysicsSyncer` ignores incoming movement while the body is kinematic.
 
 PEAK holds the item root at `Item.defaultPos` in the scout's look space (`CharacterRagdoll.SaveAdditionalTransformPositions`: `animationLookTransform.TransformPoint(defaultPos)`, +X right, +Y up, +Z forward; vanilla items use Z = 1). The cloned blowgun has `(0, 0.33, 1)`, centred at the mouth. Moving the gun on screen goes through `defaultPos` only: offsetting the mesh or hand anchors away from the item root puts the hands out of arm's reach, the hand joints drag the gun back to the centre, and the arms twist.
 

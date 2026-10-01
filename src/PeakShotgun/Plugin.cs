@@ -32,7 +32,7 @@ public partial class Plugin : BaseUnityPlugin
     internal static int LocalConfiguredShots => Mathf.Max(1, shots?.Value ?? 5);
 
     /// <summary>Magazine size in use: host-synced in multiplayer, otherwise local config.</summary>
-    internal static int ShotCount => HostShotSync.ShotCount;
+    internal static int ShotCount => HostConfigSync.ShotCount;
 
     internal static float ModelScale { get; private set; } = 0.015f;
 
@@ -350,7 +350,7 @@ public partial class Plugin : BaseUnityPlugin
         LuggageLiftExtra = Config.Bind("Model", "LuggageFloorPad", 0.025f, "Extra padding above the luggage floor after snapping the mesh bottom onto the suitcase lining.").Value;
         new Harmony(Name ?? "PeakShotgun").PatchAll();
         gameObject.AddComponent<ShotgunCameraNearClip>();
-        gameObject.AddComponent<HostShotSync>();
+        gameObject.AddComponent<HostConfigSync>();
         StartCoroutine(WaitForBlowgun());
         shoreSpawnRoutine = StartCoroutine(ShoreTestSpawns.WhenTheShoreIsReady());
         SceneManager.sceneLoaded += OnSceneLoaded;
@@ -407,8 +407,8 @@ public partial class Plugin : BaseUnityPlugin
             Config.Reload();
             PoseVersion++;
             ApplyLuggageSpawnConfig();
-            // Host publishes Shots; clients keep the room value (ignore their own Shots for ammo).
-            HostShotSync.SyncFromLocalRole(reason);
+            // Host publishes Shots and combat rules; clients keep the room values (ignore their own config).
+            HostConfigSync.SyncFromLocalRole(reason);
             LogPose($"Config reloaded ({reason}); held pose now");
             Log.LogInfo($"Config reloaded ({reason}); shots per shotgun now {ShotCount}.");
         }
@@ -462,7 +462,12 @@ public partial class Plugin : BaseUnityPlugin
         }
 
         shoreSpawnRoutine = StartCoroutine(ShoreTestSpawns.WhenTheShoreIsReady());
-        RootsLuggagePatch.ResetGuarantees();
+
+        // Shotgun loot bookkeeping follows the run id, not scene loads (a quicksave reload is the same run).
+        if (mode == LoadSceneMode.Single)
+        {
+            ShotgunLootLedger.OnMapLoaded();
+        }
     }
 
     private IEnumerator WaitForBlowgun()
@@ -627,7 +632,10 @@ public partial class Plugin : BaseUnityPlugin
                 : $"Registered the shotgun for Roots luggage only ({GuaranteedLuggageShotguns} random suitcases always forced).");
     }
 
-    /// <summary>Applies <see cref="CanSpawnOnAnyBiome"/> to the prefab loot table (startup + live config reload).</summary>
+    /// <summary>
+    /// Applies <see cref="CanSpawnOnAnyBiome"/> to the prefab loot table (startup + live config reload).
+    /// Leaves the run's shotgun count and Roots picks alone; only a new map resets those.
+    /// </summary>
     internal static void ApplyLuggageSpawnConfig(LootData? loot = null)
     {
         if (loot == null && ShotgunPrefab != null)
@@ -645,7 +653,6 @@ public partial class Plugin : BaseUnityPlugin
         // still hard-capped at MaxShotgunsPerBiome (Common used to flood Mesa/canyon luggage).
         loot.Rarity = CanSpawnOnAnyBiome ? Rarity.RidiculouslyRare : Rarity.Rare;
         LootData.AllSpawnWeightData = null;
-        RootsLuggagePatch.ResetGuarantees();
     }
 
     private static void ApplyIcon(Item item)

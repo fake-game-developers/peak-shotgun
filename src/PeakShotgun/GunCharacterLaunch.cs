@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Peak.Shotgun;
 
-public class GunCharacterLaunch : MonoBehaviour
+public class GunCharacterLaunch : MonoBehaviourPunCallbacks
 {
     private static readonly Type? ZombieType = AccessToolsType("MushroomZombie");
 
@@ -21,6 +21,8 @@ public class GunCharacterLaunch : MonoBehaviour
 
     private const int HitsToKnockDown = 2;
 
+    // Zombie shot state is owned by the zombie's owner and mirrored to everyone (RPC_ZombieShotState), so a new
+    // owner after host migration continues from it and late joiners see a knocked-down zombie as silenced.
     private int shotgunHits;
 
     private bool heldDown;
@@ -34,9 +36,26 @@ public class GunCharacterLaunch : MonoBehaviour
     public static bool IsZombie(Character character) =>
         ZombieType != null && character.GetComponent(ZombieType) != null;
 
+    /// <summary>
+    /// Zombie hit sent by a remote shooter. The zombie's owner applies it only for a shot the host accepted
+    /// (<paramref name="gunViewId"/> + <paramref name="shotId"/>) and only while the room allows shooting zombies.
+    /// </summary>
     [PunRPC]
-    public void RPC_ShotgunBlast(Vector3 direction, Vector3 point)
+    public void RPC_ShotgunBlast(Vector3 direction, Vector3 point, int gunViewId, int shotId, PhotonMessageInfo info)
     {
+        Character? character = GetComponent<Character>();
+        if (character == null || !character.photonView.IsMine || !IsZombie(character) || !ShotgunCombat.CanShootZombies)
+        {
+            return;
+        }
+
+        PhotonView? gunView = PhotonView.Find(gunViewId);
+        Action_Gun? gun = gunView != null ? gunView.GetComponent<Action_Gun>() : null;
+        if (gun == null || !gun.TryConsumeShot(info.Sender, shotId, character.photonView.ViewID))
+        {
+            return;
+        }
+
         Blast(direction, point);
     }
 
@@ -64,12 +83,16 @@ public class GunCharacterLaunch : MonoBehaviour
             return;
         }
 
+        BroadcastShotState();
+
         // Injury does not affect zombies. The first shot only adds drowsy, so they can get back up.
         character.refs.afflictions.AddAffliction(
             new Affliction_AdjustStatus(CharacterAfflictions.STATUSTYPE.Drowsy, ZombieDrowsyDamage, 1f));
     }
 
-    private void Update()
+    // Bodypart forces accumulate until the next physics step, so the shove has to be added once per step,
+    // not once per rendered frame, or its strength scales with frame rate.
+    private void FixedUpdate()
     {
         if (shoveTime <= 0f)
         {
@@ -83,8 +106,10 @@ public class GunCharacterLaunch : MonoBehaviour
             return;
         }
 
-        shoveTime -= Time.deltaTime;
-        character.AddForce(shoveDirection * ShoveAcceleration, 1f, 1f);
+        float step = Time.fixedDeltaTime;
+        float fraction = Mathf.Min(shoveTime, step) / step;
+        shoveTime -= step;
+        character.AddForce(shoveDirection * (ShoveAcceleration * fraction), 1f, 1f);
     }
 
     private void LateUpdate()
@@ -103,6 +128,7 @@ public class GunCharacterLaunch : MonoBehaviour
         if (character.data.dead)
         {
             heldDown = false;
+            BroadcastShotState();
             return;
         }
 
@@ -115,11 +141,43 @@ public class GunCharacterLaunch : MonoBehaviour
         heldDown = true;
         character.PassOutInstantly();
         HoldDown(character);
-        character.photonView.RPC(nameof(RPC_SilenceZombie), RpcTarget.All);
+        Silence();
+        BroadcastShotState();
+    }
+
+    private void BroadcastShotState()
+    {
+        if (PhotonNetwork.InRoom && photonView != null)
+        {
+            photonView.RPC(nameof(RPC_ZombieShotState), RpcTarget.Others, shotgunHits, heldDown);
+        }
     }
 
     [PunRPC]
-    public void RPC_SilenceZombie()
+    public void RPC_ZombieShotState(int hits, bool down, PhotonMessageInfo info)
+    {
+        if (info.Sender == null || info.Sender != photonView.Owner)
+        {
+            return;
+        }
+
+        shotgunHits = hits;
+        heldDown = down;
+        if (down)
+        {
+            Silence();
+        }
+    }
+
+    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+    {
+        if (photonView != null && photonView.IsMine && (shotgunHits > 0 || heldDown))
+        {
+            photonView.RPC(nameof(RPC_ZombieShotState), newPlayer, shotgunHits, heldDown);
+        }
+    }
+
+    private void Silence()
     {
         if (Silenced)
         {

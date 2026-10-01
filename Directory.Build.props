@@ -37,8 +37,10 @@
     <PeakGameRootDir Condition="'$(PeakGameRootDir)' == '' and Exists('$(HOME)/.steam/steam/steamapps/common/PEAK/PEAK.exe')">$(HOME)/.steam/steam/steamapps/common/PEAK/</PeakGameRootDir>
 
     <PeakGameRootDir Condition="'$(PeakGameRootDir)' != ''">$([MSBuild]::EnsureTrailingSlash($(PeakGameRootDir)))</PeakGameRootDir>
-    <!-- Allow CI to pass ManagedDir directly (e.g. stripped PEAKGameLibs). -->
+    <!-- Allow CI to pass ManagedDir directly (e.g. stripped PEAKGameLibs), with or without a trailing slash. -->
     <ManagedDir Condition="'$(ManagedDir)' == '' and '$(PeakGameRootDir)' != ''">$(PeakGameRootDir)PEAK_Data\Managed\</ManagedDir>
+    <!-- Use this one everywhere: a -p:ManagedDir= global property cannot be reassigned here. -->
+    <PeakManagedDir Condition="'$(ManagedDir)' != ''">$([MSBuild]::EnsureTrailingSlash('$(ManagedDir)'))</PeakManagedDir>
 
     <!-- Default plugins path is unused unless DeployToPeak=true -->
     <PeakPluginsDir Condition="'$(PeakPluginsDir)' == '' and '$(PeakGameRootDir)' != ''">$(PeakGameRootDir)BepInEx\plugins\PeakShotgun\</PeakPluginsDir>
