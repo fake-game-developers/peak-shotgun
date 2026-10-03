@@ -56,6 +56,22 @@ public class Action_Gun : ItemAction
 
     private readonly Dictionary<long, HashSet<int>> consumedTargets = new();
 
+    // Hit RPCs from the shooter can arrive before the host's ShotResult on other clients (different senders,
+    // no cross-sender order). Keep those hits until the shot is authorized, then apply once.
+    private readonly Dictionary<long, List<PendingHit>> pendingHits = new();
+
+    private readonly struct PendingHit
+    {
+        public readonly int TargetId;
+        public readonly System.Action Apply;
+
+        public PendingHit(int targetId, System.Action apply)
+        {
+            TargetId = targetId;
+            Apply = apply;
+        }
+    }
+
     /// <summary>
     /// Asks the host to authorize one shot. Nothing happens locally until the host accepts it, and only one
     /// request is outstanding at a time, so the last round cannot be spent twice. An unanswered request is
@@ -227,14 +243,18 @@ public class Action_Gun : ItemAction
         {
             authorizedShots.Remove(key);
             consumedTargets.Remove(key);
+            pendingHits.Remove(key);
         }
 
-        authorizedShots[ShotKey(shooterActor, shotId)] = now;
+        long authorizedKey = ShotKey(shooterActor, shotId);
+        authorizedShots[authorizedKey] = now;
+        FlushPendingHits(authorizedKey);
     }
 
     /// <summary>
     /// Receiving end of a hit: true once per target for each shot the host accepted from that sender.
-    /// Offline there is nothing to check.
+    /// Offline there is nothing to check. When the shot is not authorized yet, returns false — use
+    /// <see cref="TryConsumeOrDeferHit"/> for hits that may race ahead of <c>RPC_ShotResult</c>.
     /// </summary>
     internal bool TryConsumeShot(Photon.Realtime.Player? sender, int shotId, int targetId)
     {
@@ -254,6 +274,44 @@ public class Action_Gun : ItemAction
             return false;
         }
 
+        return ConsumeTarget(key, targetId);
+    }
+
+    /// <summary>
+    /// Like <see cref="TryConsumeShot"/>, but if the host's acceptance has not arrived yet, queues
+    /// <paramref name="apply"/> and runs it when the shot becomes authorized (still once per target).
+    /// Returns true when the caller should run <paramref name="apply"/> immediately.
+    /// </summary>
+    internal bool TryConsumeOrDeferHit(Photon.Realtime.Player? sender, int shotId, int targetId, System.Action apply)
+    {
+        if (!PhotonNetwork.InRoom)
+        {
+            return true;
+        }
+
+        if (sender == null)
+        {
+            return false;
+        }
+
+        long key = ShotKey(sender.ActorNumber, shotId);
+        if (!authorizedShots.ContainsKey(key))
+        {
+            if (!pendingHits.TryGetValue(key, out List<PendingHit> list))
+            {
+                list = new List<PendingHit>();
+                pendingHits[key] = list;
+            }
+
+            list.Add(new PendingHit(targetId, apply));
+            return false;
+        }
+
+        return ConsumeTarget(key, targetId);
+    }
+
+    private bool ConsumeTarget(long key, int targetId)
+    {
         if (!consumedTargets.TryGetValue(key, out HashSet<int> targets))
         {
             targets = new HashSet<int>();
@@ -261,6 +319,23 @@ public class Action_Gun : ItemAction
         }
 
         return targets.Add(targetId);
+    }
+
+    private void FlushPendingHits(long key)
+    {
+        if (!pendingHits.TryGetValue(key, out List<PendingHit> list))
+        {
+            return;
+        }
+
+        pendingHits.Remove(key);
+        foreach (PendingHit hit in list)
+        {
+            if (ConsumeTarget(key, hit.TargetId))
+            {
+                hit.Apply();
+            }
+        }
     }
 
     private bool HasAmmo()
@@ -371,11 +446,22 @@ public class Action_Gun : ItemAction
         }
 
         Character local = Character.localCharacter;
-        if (local == null || !TryConsumeShot(info.Sender, shotId, local.photonView.ViewID))
+        if (local == null)
         {
             return;
         }
 
+        int targetId = local.photonView.ViewID;
+        if (!TryConsumeOrDeferHit(info.Sender, shotId, targetId, () => ApplyGunImpact(local, direction, endpoint)))
+        {
+            return;
+        }
+
+        ApplyGunImpact(local, direction, endpoint);
+    }
+
+    private void ApplyGunImpact(Character local, Vector3 direction, Vector3 endpoint)
+    {
         local.GetComponent<GunCharacterLaunch>().Blast(direction, endpoint);
         if (!ShotgunCombat.FriendlyFire)
         {

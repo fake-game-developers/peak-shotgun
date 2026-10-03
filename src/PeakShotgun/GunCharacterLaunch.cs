@@ -51,7 +51,13 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
 
         PhotonView? gunView = PhotonView.Find(gunViewId);
         Action_Gun? gun = gunView != null ? gunView.GetComponent<Action_Gun>() : null;
-        if (gun == null || !gun.TryConsumeShot(info.Sender, shotId, character.photonView.ViewID))
+        if (gun == null)
+        {
+            return;
+        }
+
+        int targetId = character.photonView.ViewID;
+        if (!gun.TryConsumeOrDeferHit(info.Sender, shotId, targetId, () => Blast(direction, point)))
         {
             return;
         }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.9
+
+- Fix scouts sometimes taking no Injury or knockback when shot by a non-host player in multiplayer
+
 ## 1.0.8
 
 - Fix `[Shootables] Spores`: hit real spore bombs (`Breakable` SporeShroom / ExploShroom / PoisonShroom), not Cloud Fungus
