@@ -21,8 +21,7 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 ## Where it spawns
 
 - **Roots:** every run, **at least two random luggage** anywhere on the Roots map are forced to contain a shotgun. No mod config turns it off, but a custom run that disables the shotgun in its item settings gets none.
-- **Other biomes:** by default the shotgun does **not** appear in luggage outside Roots.
-- Set `CanSpawnOnAnyBiome = true` under `[Shotgun]` in `BepInEx/config/PeakShotgun.cfg` to also allow very rare random shotgun rolls in other biomes. Roots still forces two suitcases either way.
+- **Other biomes:** luggage outside Roots is locked out only when **Zombies is the sole enabled** `[Shootables]` target. Any other shootables mix (or `CanSpawnOnAnyBiome = true`) allows **RidiculouslyRare** rolls in every biome. Roots still forces two suitcases either way.
 - **Cap:** at most **4** luggage per biome can contain a shotgun in a single run (including Roots).
 
 It looks like the blowgun, because that is the model PEAK ships. It does not replace the blowgun.
@@ -33,7 +32,7 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 
 | Section | Key | Default | Meaning |
 |---|---|---|---|
-| `[Shotgun]` | `CanSpawnOnAnyBiome` | `false` | `false` = Roots luggage only (plus the two forced suitcases). `true` = can also roll in luggage in other biomes |
+| `[Shotgun]` | `CanSpawnOnAnyBiome` | `false` | Force rare rolls in every biome. When `false`, Roots-only only if Zombies is the sole `[Shootables]` target |
 | `[Shotgun]` | `Shots` | `5` | Shots per shotgun (host's value in multiplayer) |
 | `[Shotgun]` | `EnableRecoil` | `true` | Push the shooter back on each shot |
 | `[Shotgun]` | `Recoil` | `5` | Recoil strength in m/s (0–10) |

@@ -65,6 +65,12 @@ internal static class ShotgunCombat
         | (shootScorpions?.Value ?? false ? ShootTargets.Scorpions : ShootTargets.None)
         | (shootDynamite?.Value ?? false ? ShootTargets.Dynamite : ShootTargets.None);
 
+    /// <summary>
+    /// True when Zombies is the only enabled shootable. That is the only shootables mix that keeps
+    /// luggage Roots-exclusive (unless <c>CanSpawnOnAnyBiome</c> forces every biome).
+    /// </summary>
+    internal static bool IsZombiesOnlyShootables => LocalShootables == ShootTargets.Zombies;
+
     internal static bool FriendlyFire => HostConfigSync.FriendlyFire;
 
     internal static bool CanShootZombies => Allows(ShootTargets.Zombies);

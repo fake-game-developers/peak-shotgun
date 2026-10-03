@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.10
+
+- Luggage stays Roots-only only when Zombies is the sole enabled shootable; any other `[Shootables]` mix unlocks rare rolls in every biome
+
 ## 1.0.9
 
 - Fix scouts sometimes taking no Injury or knockback when shot by a non-host player in multiplayer

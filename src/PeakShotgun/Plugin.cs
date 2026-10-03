@@ -51,11 +51,12 @@ public partial class Plugin : BaseUnityPlugin
     private static ConfigEntry<bool>? canSpawnOnAnyBiome;
 
     /// <summary>
-    /// When false (default), luggage loot is Roots-only.
-    /// When true, the shotgun can also roll in luggage on any biome.
-    /// Roots always gets <see cref="GuaranteedLuggageShotguns"/> random forced suitcases, regardless of this flag.
+    /// Luggage is Roots-only only when Zombies is the sole enabled shootable (and this flag is false).
+    /// Any other <c>[Shootables]</c> mix, or this flag set true, allows <see cref="Rarity.RidiculouslyRare"/>
+    /// rolls in every biome. Roots always gets <see cref="GuaranteedLuggageShotguns"/> forced suitcases.
     /// </summary>
-    internal static bool CanSpawnOnAnyBiome => canSpawnOnAnyBiome?.Value ?? false;
+    internal static bool CanSpawnOnAnyBiome =>
+        (canSpawnOnAnyBiome?.Value ?? false) || !ShotgunCombat.IsZombiesOnlyShootables;
 
     /// <summary>How many random Roots luggage get a forced shotgun each run (anywhere on the Roots map).</summary>
     internal const int GuaranteedLuggageShotguns = 2;
@@ -319,7 +320,7 @@ public partial class Plugin : BaseUnityPlugin
             "Shotgun",
             "CanSpawnOnAnyBiome",
             false,
-            "If false (default), shotguns only appear in Roots luggage. If true, they can also roll in luggage in other biomes. Roots always forces two random suitcases to contain a shotgun either way.");
+            "Force rare shotgun rolls in every biome. When false, luggage is Roots-only only if Zombies is the sole enabled [Shootables] target; any other shootables mix also unlocks all-biome rolls. Roots always forces two random suitcases either way.");
         ShotgunCombat.Bind(Config);
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
