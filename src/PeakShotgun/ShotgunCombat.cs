@@ -106,7 +106,7 @@ internal static class ShotgunCombat
         shootMandrake = config.Bind("Shootables", "Mandrake", false, "Shotguns can destroy mandrakes. Host's value is used in multiplayer.");
         shootBeetles = config.Bind("Shootables", "Beetles", false, "Shotguns can kill beetles. Host's value is used in multiplayer.");
         shootSpiders = config.Bind("Shootables", "Spiders", false, "Shotguns can stun spiders (same as throwing an item at them). Host's value is used in multiplayer.");
-        shootSpores = config.Bind("Shootables", "Spores", false, "Shotguns can break spore bombs and clear spore clouds. Host's value is used in multiplayer.");
+        shootSpores = config.Bind("Shootables", "Spores", false, "Shotguns can break spore bombs (spore, explosive, and poison) and clear spore clouds. Host's value is used in multiplayer.");
         shootScorpions = config.Bind("Shootables", "Scorpions", false, "Shotguns can kill scorpions. Host's value is used in multiplayer.");
         shootDynamite = config.Bind("Shootables", "Dynamite", false, "Shotguns can light dynamite fuses. Host's value is used in multiplayer.");
     }
@@ -195,9 +195,9 @@ internal static class ShotgunCombat
 
         if (CanShootSpores)
         {
-            if (collider.GetComponentInParent<CloudFungus>() is { } fungus)
+            if (collider.GetComponentInParent<Breakable>() is { } breakable && IsSporeBomb(breakable))
             {
-                return Found(fungus, ShotTargetKind.SporeBomb, out target, out kind);
+                return Found(breakable, ShotTargetKind.SporeBomb, out target, out kind);
             }
 
             StatusEmitter? emitter = collider.GetComponentInParent<StatusEmitter>();
@@ -217,6 +217,37 @@ internal static class ShotgunCombat
         return true;
     }
 
+    /// <summary>
+    /// Spore / explosive / poison bombs are <see cref="Breakable"/> mushrooms (prefab names like
+    /// SporeShroom, ExploShroom, PoisonShroom). Not <see cref="CloudFungus"/> (the deployable platform).
+    /// </summary>
+    private static bool IsSporeBomb(Breakable breakable)
+    {
+        if (breakable == null || breakable is BreakableEgg)
+        {
+            return false;
+        }
+
+        if (NameLooksLikeSporeBomb(breakable.gameObject.name))
+        {
+            return true;
+        }
+
+        Item? item = breakable.GetComponent<Item>();
+        string? itemName = item != null ? item.UIData.itemName : null;
+        return !string.IsNullOrEmpty(itemName) && NameLooksLikeSporeBomb(itemName);
+    }
+
+    private static bool NameLooksLikeSporeBomb(string name) =>
+        ContainsOrdinalIgnoreCase(name, "SporeShroom")
+        || ContainsOrdinalIgnoreCase(name, "ExploShroom")
+        || ContainsOrdinalIgnoreCase(name, "PoisonShroom")
+        || ContainsOrdinalIgnoreCase(name, "SporeMushroom")
+        || ContainsOrdinalIgnoreCase(name, "SporeFungus");
+
+    private static bool ContainsOrdinalIgnoreCase(string haystack, string needle) =>
+        haystack.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
+
     private static bool IsSporeCloud(StatusEmitter? emitter) =>
         emitter != null && emitter.statusType == CharacterAfflictions.STATUSTYPE.Spores;
 
@@ -234,7 +265,7 @@ internal static class ShotgunCombat
             ShotTargetKind.Scorpion => Near<Scorpion>(root),
             ShotTargetKind.Mandrake => Near<Mandrake>(root),
             ShotTargetKind.Dynamite => Near<Dynamite>(root),
-            ShotTargetKind.SporeBomb => Near<CloudFungus>(root),
+            ShotTargetKind.SporeBomb => Near<Breakable>(root) is { } breakable && IsSporeBomb(breakable) ? breakable : null,
             ShotTargetKind.SporeCloud => Near<StatusEmitter>(root) is { } emitter && IsSporeCloud(emitter) ? emitter : null,
             _ => null,
         };
@@ -280,7 +311,7 @@ internal static class ShotgunCombat
                 ((Dynamite)target).LightFlare();
                 break;
             case ShotTargetKind.SporeBomb:
-                ((CloudFungus)target).Break();
+                BreakSporeBomb((Breakable)target);
                 break;
             case ShotTargetKind.Mandrake:
             case ShotTargetKind.SporeCloud:
@@ -310,6 +341,17 @@ internal static class ShotgunCombat
         }
 
         return target.gameObject;
+    }
+
+    /// <summary>
+    /// <see cref="Breakable.Break"/> expects a collision for ragdoll push / kinematic stick. A pellet has
+    /// neither, so clear those flags and pass null — the bomb still pops (cloud / VFX) and despawns.
+    /// </summary>
+    private static void BreakSporeBomb(Breakable breakable)
+    {
+        breakable.ragdollCharacterOnBreak = false;
+        breakable.spawnsItemsKinematic = false;
+        breakable.Break(null!);
     }
 
     private static bool TryHitCharacter(Character character, Action_Gun gun, int shotId, Vector3 hitPoint, Vector3 direction)

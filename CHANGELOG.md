@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.8
+
+- Fix `[Shootables] Spores`: hit real spore bombs (`Breakable` SporeShroom / ExploShroom / PoisonShroom), not Cloud Fungus
+
 ## 1.0.7
 
 - Host authorizes each shot before it fires, so ammo and hits stay consistent in multiplayer

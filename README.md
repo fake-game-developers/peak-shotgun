@@ -42,7 +42,7 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[Shootables]` | `Mandrake` | `false` | Destroy mandrakes |
 | `[Shootables]` | `Beetles` | `false` | Kill beetles |
 | `[Shootables]` | `Spiders` | `false` | Stun spiders |
-| `[Shootables]` | `Spores` | `false` | Break spore bombs / clear spore clouds |
+| `[Shootables]` | `Spores` | `false` | Break spore bombs (spore, explosive, poison) / clear spore clouds |
 | `[Shootables]` | `Scorpions` | `false` | Kill scorpions |
 | `[Shootables]` | `Dynamite` | `false` | Light dynamite fuses |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
