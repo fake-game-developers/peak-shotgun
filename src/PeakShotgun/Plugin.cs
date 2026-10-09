@@ -50,6 +50,8 @@ public partial class Plugin : BaseUnityPlugin
 
     private static ConfigEntry<bool>? canSpawnOnAnyBiome;
 
+    private static ConfigEntry<bool>? giveShotgunOnSpawn;
+
     /// <summary>
     /// Luggage is Roots-only only when Zombies is the sole enabled shootable (and this flag is false).
     /// Any other <c>[Shootables]</c> mix, or this flag set true, allows <see cref="Rarity.RidiculouslyRare"/>
@@ -57,6 +59,9 @@ public partial class Plugin : BaseUnityPlugin
     /// </summary>
     internal static bool CanSpawnOnAnyBiome =>
         (canSpawnOnAnyBiome?.Value ?? false) || !ShotgunCombat.IsZombiesOnlyShootables;
+
+    /// <summary>Host gives each scout one shotgun in hand once per run (late joiners included).</summary>
+    internal static bool GiveShotgunOnSpawn => giveShotgunOnSpawn?.Value ?? false;
 
     /// <summary>How many random Roots luggage get a forced shotgun each run (anywhere on the Roots map).</summary>
     internal const int GuaranteedLuggageShotguns = 2;
@@ -321,6 +326,11 @@ public partial class Plugin : BaseUnityPlugin
             "CanSpawnOnAnyBiome",
             false,
             "Force rare shotgun rolls in every biome. When false, luggage is Roots-only only if Zombies is the sole enabled [Shootables] target; any other shootables mix also unlocks all-biome rolls. Roots always forces two random suitcases either way.");
+        giveShotgunOnSpawn = Config.Bind(
+            "Shotgun",
+            "GiveShotgunOnSpawn",
+            false,
+            "Host only: give every scout one shotgun in hand when they spawn into the climb or join mid-run (Shore and later — not at the Airport). Once per player per run. Custom runs that disable the shotgun get none.");
         ShotgunCombat.Bind(Config);
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
@@ -353,6 +363,7 @@ public partial class Plugin : BaseUnityPlugin
         gameObject.AddComponent<ShotgunCameraNearClip>();
         gameObject.AddComponent<HostConfigSync>();
         StartCoroutine(WaitForBlowgun());
+        StartCoroutine(StartingShotgunGiver.WhenPlayersAreReady());
         shoreSpawnRoutine = StartCoroutine(ShoreTestSpawns.WhenTheShoreIsReady());
         SceneManager.sceneLoaded += OnSceneLoaded;
         lastConfigWriteUtc = SafeConfigWriteTime();

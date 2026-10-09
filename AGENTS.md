@@ -46,6 +46,7 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 | `ShotgunLootLedger` | Per-run loot bookkeeping keyed by `RunManager.RunId` and a stable suitcase key (scene + scene view id): the marked Roots suitcases, shotguns per suitcase per biome, and each seat pose. The host publishes it as room property `PeakShotgun_Loot` and saves it to `BepInEx/config/PeakShotgun.loot.json` (last 20 runs), so quicksave reloads and host migration keep it. A re-rolled suitcase replaces its own count; a gun restored from save history counts too |
 | `ShotgunLuggageRest` | Luggage-only visual pose and freeze, on the item root. The host arms it in `Luggage.OffsetSpawn` (for saved loot, from the pose in `ShotgunLootLedger` in `Spawner.InitializePhysics`), sends it to the others, and replays it to late joiners |
 | `ShoreTestSpawns` | Only with `[Debug] EnableDebugMode` (default off): the host spawns a shotgun and luggage at the Airport, and three zombies and one shotgun near the local player once per Shore load |
+| `StartingShotgunGiver` | Only with `[Shotgun] GiveShotgunOnSpawn` (default off): host calls `CharacterItems.SpawnItemInHand` once per player per run after the climb starts (never Airport), after beach wake / grounded (skips if they already hold a shotgun or the run disables the item) |
 
 ### Shot
 

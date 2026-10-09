@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.11
+
+- Add `[Shotgun] GiveShotgunOnSpawn` (default off): host gives each scout one shotgun in hand when they spawn into the climb or join mid-run (not at the Airport)
+
 ## 1.0.10
 
 - Luggage stays Roots-only only when Zombies is the sole enabled shootable; any other `[Shootables]` mix unlocks rare rolls in every biome
