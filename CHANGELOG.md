@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.12
+
+- Thunderstore package readme is now player-facing only (no build/CI docs)
+
 ## 1.0.11
 
 - Add `[Shotgun] GiveShotgunOnSpawn` (default off): host gives each scout one shotgun in hand when they spawn into the climb or join mid-run (not at the Airport)
