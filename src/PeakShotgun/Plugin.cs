@@ -70,13 +70,13 @@ public partial class Plugin : BaseUnityPlugin
     private static ConfigEntry<int>? ammoPilesPerCampfire;
 
     /// <summary>Host only: spawn ammo piles around segment campfires.</summary>
-    internal static bool SpawnAmmoPilesAtCampfire => spawnAmmoPilesAtCampfire?.Value ?? false;
+    internal static bool SpawnAmmoPilesAtCampfire => spawnAmmoPilesAtCampfire?.Value ?? true;
 
     /// <summary>How many ammo piles the host places at each campfire when spawning is enabled.</summary>
     internal static int AmmoPilesPerCampfire => Mathf.Clamp(ammoPilesPerCampfire?.Value ?? 1, 1, 8);
 
     /// <summary>Uniform scale of the ammo pile mesh (unit-normalized).</summary>
-    internal static float AmmoPileScale { get; private set; } = 0.425f;
+    internal const float AmmoPileScale = 0.425f;
 
     /// <summary>How many random Roots luggage get a forced shotgun each run (anywhere on the Roots map).</summary>
     internal const int GuaranteedLuggageShotguns = 2;
@@ -349,7 +349,7 @@ public partial class Plugin : BaseUnityPlugin
         spawnAmmoPilesAtCampfire = Config.Bind(
             "AmmoPile",
             "SpawnAtCampfire",
-            false,
+            true,
             "Host only: spawn ammo piles around each segment campfire. Interact while holding a shotgun with fewer than Shots remaining to refill (never above Shots). The pile stays.");
         ammoPilesPerCampfire = Config.Bind(
             "AmmoPile",
@@ -361,7 +361,6 @@ public partial class Plugin : BaseUnityPlugin
         ShotgunCombat.Bind(Config);
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
-        AmmoPileScale = Config.Bind("AmmoPile", "Scale", 0.425f, "Uniform scale of the ammo pile mesh (mesh is unit-normalized).").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
         // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.
         // These are live: edit and save the .cfg while the game runs and the pose updates within a second.

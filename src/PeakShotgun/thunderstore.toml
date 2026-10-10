@@ -7,7 +7,7 @@ repository = "https://thunderstore.io"
 [package]
 namespace = "FakeGameDevelopers"
 name = "PeakShotgun"
-description = "Bring a shotgun on your PEAK climb. Two Roots suitcases always pack one; optional campfire ammo piles refill your magazine. Pellet blasts injure scouts, ragdoll zombies, and KO them on the second shot."
+description = "Bring a shotgun on your PEAK climb. Two Roots suitcases always pack one; campfire ammo piles refill your magazine. Pellet blasts injure scouts, ragdoll zombies, and KO them on the second shot."
 websiteUrl = "https://github.com/fake-game-developers/peak-shotgun"
 containsNsfwContent = false
 

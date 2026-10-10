@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.14
+
+- Enable `[AmmoPile] SpawnAtCampfire` by default
+- Remove `[AmmoPile] Scale` (ammo pile size is fixed in the mod)
+
 ## 1.0.13
 
 - Add optional campfire **ammo piles** (`[AmmoPile] SpawnAtCampfire`, default off): the host places crate piles at each segment campfire (same moment as marshmallows)

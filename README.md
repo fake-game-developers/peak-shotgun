@@ -26,7 +26,7 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 - **Roots:** every run, **at least two random luggage** anywhere on the Roots map are forced to contain a shotgun. No mod config turns it off, but a custom run that disables the shotgun in its item settings gets none.
 - **Other biomes:** luggage outside Roots is locked out only when **Zombies is the sole enabled** `[Shootables]` target. Any other shootables mix (or `CanSpawnOnAnyBiome = true`) allows **RidiculouslyRare** rolls in every biome. Roots still forces two suitcases either way.
 - **Cap:** at most **4** luggage per biome can contain a shotgun in a single run (including Roots).
-- **Campfire ammo (optional):** set `SpawnAtCampfire = true` under `[AmmoPile]` and the **host** places ammo piles at each segment campfire. Hold a shotgun with fewer than `Shots` left, interact (**REFILL**), and the magazine fills up to `Shots` (never above). The pile stays. Ammo piles never appear in luggage.
+- **Campfire ammo:** by default the **host** places ammo piles at each segment campfire (`[AmmoPile] SpawnAtCampfire`). Hold a shotgun with fewer than `Shots` left, interact (**REFILL**), and the magazine fills up to `Shots` (never above). The pile stays. Ammo piles never appear in luggage. Set `SpawnAtCampfire = false` to disable.
 
 It looks like the blowgun, because that is the model PEAK ships. It does not replace the blowgun.
 
@@ -41,7 +41,7 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[Shotgun]` | `Shots` | `5` | Shots per shotgun (host's value in multiplayer) |
 | `[Shotgun]` | `EnableRecoil` | `true` | Push the shooter back on each shot |
 | `[Shotgun]` | `Recoil` | `5` | Recoil strength in m/s (0–10) |
-| `[AmmoPile]` | `SpawnAtCampfire` | `false` | Host only: place ammo piles at segment campfires |
+| `[AmmoPile]` | `SpawnAtCampfire` | `true` | Host only: place ammo piles at segment campfires |
 | `[AmmoPile]` | `PilesPerCampfire` | `1` | How many piles per campfire (1–8) when spawning is on |
 | `[Combat]` | `FriendlyFire` | `true` | `true` = injure other scouts. `false` = knockback only, no Injury |
 | `[Shootables]` | `Zombies` | `true` | Hit / knock down zombies |
