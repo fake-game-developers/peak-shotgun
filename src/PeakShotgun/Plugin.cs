@@ -26,6 +26,8 @@ public partial class Plugin : BaseUnityPlugin
 
     internal static GameObject? ShotgunPrefab { get; private set; }
 
+    internal static GameObject? AmmoPilePrefab { get; private set; }
+
     private static ConfigEntry<int>? shots;
 
     /// <summary>Local <c>Shots</c> config (host publishes this; clients ignore it for ammo).</summary>
@@ -62,6 +64,19 @@ public partial class Plugin : BaseUnityPlugin
 
     /// <summary>Host gives each scout one shotgun in hand once per run (late joiners included).</summary>
     internal static bool GiveShotgunOnSpawn => giveShotgunOnSpawn?.Value ?? false;
+
+    private static ConfigEntry<bool>? spawnAmmoPilesAtCampfire;
+
+    private static ConfigEntry<int>? ammoPilesPerCampfire;
+
+    /// <summary>Host only: spawn ammo piles around segment campfires.</summary>
+    internal static bool SpawnAmmoPilesAtCampfire => spawnAmmoPilesAtCampfire?.Value ?? false;
+
+    /// <summary>How many ammo piles the host places at each campfire when spawning is enabled.</summary>
+    internal static int AmmoPilesPerCampfire => Mathf.Clamp(ammoPilesPerCampfire?.Value ?? 1, 1, 8);
+
+    /// <summary>Uniform scale of the ammo pile mesh (unit-normalized).</summary>
+    internal static float AmmoPileScale { get; private set; } = 0.425f;
 
     /// <summary>How many random Roots luggage get a forced shotgun each run (anywhere on the Roots map).</summary>
     internal const int GuaranteedLuggageShotguns = 2;
@@ -331,9 +346,22 @@ public partial class Plugin : BaseUnityPlugin
             "GiveShotgunOnSpawn",
             false,
             "Host only: give every scout one shotgun in hand when they spawn into the climb or join mid-run (Shore and later — not at the Airport). Once per player per run. Custom runs that disable the shotgun get none.");
+        spawnAmmoPilesAtCampfire = Config.Bind(
+            "AmmoPile",
+            "SpawnAtCampfire",
+            false,
+            "Host only: spawn ammo piles around each segment campfire. Interact while holding a shotgun with fewer than Shots remaining to refill (never above Shots). The pile stays.");
+        ammoPilesPerCampfire = Config.Bind(
+            "AmmoPile",
+            "PilesPerCampfire",
+            1,
+            new ConfigDescription(
+                "How many ammo piles to place at each campfire when SpawnAtCampfire is true.",
+                new AcceptableValueRange<int>(1, 8)));
         ShotgunCombat.Bind(Config);
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
+        AmmoPileScale = Config.Bind("AmmoPile", "Scale", 0.425f, "Uniform scale of the ammo pile mesh (mesh is unit-normalized).").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
         // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.
         // These are live: edit and save the .cfg while the game runs and the pose updates within a second.
@@ -363,8 +391,10 @@ public partial class Plugin : BaseUnityPlugin
         gameObject.AddComponent<ShotgunCameraNearClip>();
         gameObject.AddComponent<HostConfigSync>();
         StartCoroutine(WaitForBlowgun());
+        StartCoroutine(WaitForAmmoPile());
         StartCoroutine(StartingShotgunGiver.WhenPlayersAreReady());
         shoreSpawnRoutine = StartCoroutine(ShoreTestSpawns.WhenTheShoreIsReady());
+        campfireAmmoRoutine = StartCoroutine(CampfireAmmoSpawner.WhenMapIsReady());
         SceneManager.sceneLoaded += OnSceneLoaded;
         lastConfigWriteUtc = SafeConfigWriteTime();
         LogPose("Held pose at startup");
@@ -462,6 +492,8 @@ public partial class Plugin : BaseUnityPlugin
 
     private Coroutine? shoreSpawnRoutine;
 
+    private Coroutine? campfireAmmoRoutine;
+
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         // Always re-read the .cfg here: map restart must see edits made while PEAK stayed open.
@@ -479,7 +511,15 @@ public partial class Plugin : BaseUnityPlugin
         if (mode == LoadSceneMode.Single)
         {
             ShotgunLootLedger.OnMapLoaded();
+            CampfireAmmoSpawner.ClearRunState();
         }
+
+        if (campfireAmmoRoutine != null)
+        {
+            StopCoroutine(campfireAmmoRoutine);
+        }
+
+        campfireAmmoRoutine = StartCoroutine(CampfireAmmoSpawner.WhenMapIsReady());
     }
 
     private IEnumerator WaitForBlowgun()
@@ -505,7 +545,32 @@ public partial class Plugin : BaseUnityPlugin
         }
     }
 
+    private IEnumerator WaitForAmmoPile()
+    {
+        var wait = new WaitForSecondsRealtime(0.5f);
+        while (AmmoPilePrefab == null)
+        {
+            try
+            {
+                CreateAmmoPile();
+            }
+            catch (Exception exception)
+            {
+                Log.LogWarning($"Could not create the ammo pile yet: {exception.Message}");
+            }
+
+            if (AmmoPilePrefab != null)
+            {
+                yield break;
+            }
+
+            yield return wait;
+        }
+    }
+
     private bool buildingShotgun;
+
+    private bool buildingAmmoPile;
 
     internal void CreateFromBlowgun()
     {
@@ -804,5 +869,131 @@ public partial class Plugin : BaseUnityPlugin
         }
 
         return dartItem;
+    }
+
+    internal void CreateAmmoPile()
+    {
+        if (AmmoPilePrefab != null || buildingAmmoPile)
+        {
+            return;
+        }
+
+        ItemDatabase? database = SingletonAsset<ItemDatabase>.Instance;
+        if (database?.Objects == null || database.Objects.Count == 0)
+        {
+            return;
+        }
+
+        Item? source = FindAmmoPileSource(database) ?? FindBlowgun(database);
+        if (source == null)
+        {
+            return;
+        }
+
+        buildingAmmoPile = true;
+        try
+        {
+            BuildAmmoPileFrom(source, database);
+        }
+        finally
+        {
+            buildingAmmoPile = false;
+        }
+    }
+
+    private void BuildAmmoPileFrom(Item source, ItemDatabase database)
+    {
+        Log.LogInfo($"Building the ammo pile from {source.name}.");
+
+        bool sourceWasActive = source.gameObject.activeSelf;
+        if (sourceWasActive)
+        {
+            source.gameObject.SetActive(false);
+        }
+
+        GameObject pileObject = Instantiate(source.gameObject);
+        if (sourceWasActive)
+        {
+            source.gameObject.SetActive(true);
+        }
+
+        pileObject.name = "AmmoPile";
+        pileObject.SetActive(false);
+        DontDestroyOnLoad(pileObject);
+
+        foreach (ItemAction existing in pileObject.GetComponents<ItemAction>())
+        {
+            DestroyImmediate(existing);
+        }
+
+        foreach (ParticleSystem particles in pileObject.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            DestroyImmediate(particles);
+        }
+
+        AmmoPileModelSwap.Apply(pileObject, database);
+
+        Item item = pileObject.GetComponent<Item>();
+        item.usingTimePrimary = 0f;
+        item.showUseProgress = false;
+        item.totalUses = -1;
+        item.UIData.itemName = "Ammo Pile";
+        item.UIData.hasMainInteract = true;
+        item.UIData.mainInteractPrompt = "REFILL";
+        item.UIData.hasSecondInteract = false;
+        item.UIData.canPocket = false;
+        item.UIData.hideFuel = true;
+        item.UIData.icon = null;
+        ItemCooking? cooking = pileObject.GetComponent<ItemCooking>();
+        if (cooking != null)
+        {
+            AccessTools.Field(typeof(ItemCooking), "disableCooking")?.SetValue(cooking, true);
+        }
+
+        // Never roll from luggage / campfire berry pools — only CampfireAmmoSpawner places these.
+        foreach (LootData loot in pileObject.GetComponents<LootData>())
+        {
+            DestroyImmediate(loot);
+        }
+
+        LootData.AllSpawnWeightData = null;
+
+        pileObject.AddComponent<AmmoPileInteract>();
+
+        new ItemContent(item).Register(ModDefinition.GetOrCreate(Info));
+        AmmoPilePrefab = pileObject;
+        Log.LogInfo("Registered the ammo pile item.");
+    }
+
+    private static Item? FindAmmoPileSource(ItemDatabase database)
+    {
+        Item? fallback = null;
+        for (int i = 0; i < database.Objects.Count; i++)
+        {
+            Item candidate = database.Objects[i];
+            if (candidate == null)
+            {
+                continue;
+            }
+
+            string name = candidate.name ?? "";
+            string uiName = candidate.UIData != null ? candidate.UIData.itemName ?? "" : "";
+            bool marshmallow = name.IndexOf("Marshmallow", StringComparison.OrdinalIgnoreCase) >= 0
+                || uiName.IndexOf("Marshmallow", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("Mallow", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (marshmallow)
+            {
+                return candidate;
+            }
+
+            if (fallback == null
+                && (name.IndexOf("Flare", StringComparison.OrdinalIgnoreCase) >= 0
+                    || uiName.IndexOf("Flare", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                fallback = candidate;
+            }
+        }
+
+        return fallback;
     }
 }

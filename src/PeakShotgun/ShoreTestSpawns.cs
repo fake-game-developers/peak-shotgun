@@ -52,6 +52,7 @@ internal static class ShoreTestSpawns
             if (!spawnedAirport && IsAirport())
             {
                 SpawnShotgun(player, "Airport");
+                SpawnAmmoPile(player, "Airport");
                 SpawnLuggage(player, "Airport");
                 spawnedAirport = true;
                 continue;
@@ -63,6 +64,7 @@ internal static class ShoreTestSpawns
             {
                 SpawnNear(player);
                 SpawnShotgun(player, "Shore");
+                SpawnAmmoPile(player, "Shore");
                 spawnedShore = true;
             }
         }
@@ -89,6 +91,30 @@ internal static class ShoreTestSpawns
         catch (System.Exception exception)
         {
             Plugin.Log.LogError($"Could not spawn the {place} test shotgun: {exception.Message}");
+        }
+    }
+
+    private static void SpawnAmmoPile(Character player, string place)
+    {
+        GameObject? pile = Plugin.AmmoPilePrefab;
+        if (pile == null)
+        {
+            Plugin.Log.LogWarning($"No ammo pile prefab yet; skipped {place} debug pile.");
+            return;
+        }
+
+        // Slightly right of the test shotgun so both are obvious.
+        Vector3 point = GroundPoint(
+            player.Center + player.transform.forward * 4f + player.transform.right * 1.5f);
+
+        try
+        {
+            PhotonNetwork.InstantiateItemRoom(pile.name, point, Quaternion.identity, false);
+            Plugin.Log.LogInfo($"Spawned a test ammo pile at the {place}.");
+        }
+        catch (System.Exception exception)
+        {
+            Plugin.Log.LogError($"Could not spawn the {place} test ammo pile: {exception.Message}");
         }
     }
 

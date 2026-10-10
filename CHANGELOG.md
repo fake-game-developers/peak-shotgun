@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.13
+
+- Add optional campfire **ammo piles** (`[AmmoPile] SpawnAtCampfire`, default off): the host places crate piles at each segment campfire (same moment as marshmallows)
+- Hold a shotgun with fewer than `Shots` remaining, look at a pile, and **REFILL** to top up the magazine (never above `Shots`); the pile stays for others
+- `[AmmoPile] PilesPerCampfire` (1–8) controls how many piles spawn per fire; piles never roll from luggage
+- Debug mode also drops a test ammo pile next to the Shore / Airport test shotgun
+
 ## 1.0.12
 
 - Thunderstore package readme is now player-facing only (no build/CI docs)

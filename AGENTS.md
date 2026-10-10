@@ -32,9 +32,12 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 
 | Type | Role |
 |---|---|
-| `Plugin` | Builds the shotgun prefab, loads the icon and shot sound, sets `item.totalUses` from config |
+| `Plugin` | Builds the shotgun and ammo-pile prefabs, loads the icon and shot sound, sets `item.totalUses` from config |
 | `Action_Gun` | Primary fire. Shot request to the host, pellet cone, hit detection, shot sound, and the blast RPC |
-| `Action_Ammo` | Host-only `TrySpendOne` lowers `ItemUses` and broadcasts it with `ApplyUsesRPC` (also the fuel bar). Clients accept `ApplyUsesRPC` only from the host, and write the count into the inventory slot whose instance-data guid matches the gun (never the currently selected slot). At zero the gun stops firing. The empty gun stays in hand |
+| `Action_Ammo` | Host-only `TrySpendOne` lowers `ItemUses` and broadcasts it with `ApplyUsesRPC` (also the fuel bar). `TryRefillToCapacity` sets remaining to `ShotCount` (never above). Clients accept `ApplyUsesRPC` only from the host, and write the count into the inventory slot whose instance-data guid matches the gun (never the currently selected slot). At zero the gun stops firing. The empty gun stays in hand |
+| `AmmoPileInteract` / `AmmoPilePatches` | Ground ammo pile: interact while holding an underfilled shotgun → host refill (pile stays). No pickup, no luggage loot |
+| `CampfireAmmoSpawner` | Host-only: when `[AmmoPile] SpawnAtCampfire` is on, places piles around each segment campfire on first `Campfire.OnEnable` |
+| `AmmoPileModelSwap` | Embedded `ammo_pile.obj` + albedo on the ammo-pile prefab |
 | `HostConfigSync` | Publishes the host's `Shots`, `FriendlyFire` and `[Shootables]` as Photon room properties; every client reads those instead of its own config |
 | `ShotgunAmmoUI` | Appends the remaining count to the hotbar name (`Item.GetItemName`) and the shoot prompt (`GUIManager.GetMainInteractPrompt`), then refreshes both after a shot |
 | `ShotgunVFX` | A short orange point light, plus a small copy of a smoke effect already in PEAK |

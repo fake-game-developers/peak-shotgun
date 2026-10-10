@@ -73,6 +73,50 @@ public class Action_Ammo : ItemAction
         }
     }
 
+    /// <summary>
+    /// Host (or offline) only: set remaining shots to <see cref="Plugin.ShotCount"/> (never above).
+    /// Returns false when the magazine was already full so the caller can leave the ammo pile alone.
+    /// </summary>
+    internal bool TryRefillToCapacity()
+    {
+        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
+        {
+            return false;
+        }
+
+        int capacity = Plugin.ShotCount;
+        item.totalUses = capacity;
+
+        if (!item.HasData(DataEntryKey.ItemUses))
+        {
+            EnsureHostMagazine();
+        }
+
+        OptionableIntItemData data = item.GetData<OptionableIntItemData>(DataEntryKey.ItemUses);
+        if (!data.HasData)
+        {
+            EnsureHostMagazine();
+            data = item.GetData<OptionableIntItemData>(DataEntryKey.ItemUses);
+        }
+
+        if (data.HasData && data.Value >= capacity)
+        {
+            // Already at or above cap — clamp down if somehow over, but do not consume a pile for a no-op.
+            if (data.Value > capacity)
+            {
+                data.Value = capacity;
+                BroadcastUses(capacity);
+            }
+
+            return false;
+        }
+
+        data.HasData = true;
+        data.Value = capacity;
+        BroadcastUses(capacity);
+        return true;
+    }
+
     private void BroadcastUses(int remaining)
     {
         int capacity = Mathf.Max(item.totalUses, Plugin.ShotCount);

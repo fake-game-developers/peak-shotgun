@@ -11,6 +11,7 @@ internal static class ItemDatabasePatch
     private static void CreateShotgun()
     {
         Plugin.Instance?.CreateFromBlowgun();
+        Plugin.Instance?.CreateAmmoPile();
     }
 }
 

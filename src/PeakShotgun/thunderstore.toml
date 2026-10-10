@@ -7,7 +7,7 @@ repository = "https://thunderstore.io"
 [package]
 namespace = "FakeGameDevelopers"
 name = "PeakShotgun"
-description = "Bring a shotgun on your PEAK climb. Two Roots suitcases always pack one; rare luggage rolls can unlock in other biomes. Pellet blasts injure scouts, ragdoll zombies, and KO them on the second shot."
+description = "Bring a shotgun on your PEAK climb. Two Roots suitcases always pack one; optional campfire ammo piles refill your magazine. Pellet blasts injure scouts, ragdoll zombies, and KO them on the second shot."
 websiteUrl = "https://github.com/fake-game-developers/peak-shotgun"
 containsNsfwContent = false
 
@@ -45,6 +45,10 @@ target = "/media/2.jpg"
 [[build.copy]]
 source = "../../media/img3.jpg"
 target = "/media/3.jpg"
+
+[[build.copy]]
+source = "../../media/img4.jpg"
+target = "/media/4.jpg"
 
 [publish]
 communities = [ "peak", ]
