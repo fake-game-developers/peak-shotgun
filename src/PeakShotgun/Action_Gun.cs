@@ -462,12 +462,12 @@ public class Action_Gun : ItemAction
 
     private void ApplyGunImpact(Character local, Vector3 direction, Vector3 endpoint)
     {
-        local.GetComponent<GunCharacterLaunch>().Blast(direction, endpoint);
-        if (!ShotgunCombat.FriendlyFire)
+        if (!ShotgunCombat.CanShootScouts)
         {
             return;
         }
 
+        local.GetComponent<GunCharacterLaunch>().Blast(direction, endpoint);
         foreach (Affliction affliction in afflictionsOnHit)
         {
             local.refs.afflictions.AddAffliction(affliction);

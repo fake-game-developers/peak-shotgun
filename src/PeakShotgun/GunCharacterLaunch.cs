@@ -19,8 +19,6 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
 
     private const float ZombieDrowsyDamage = 0.5f;
 
-    private const int HitsToKnockDown = 2;
-
     // Zombie shot state is owned by the zombie's owner and mirrored to everyone (RPC_ZombieShotState), so a new
     // owner after host migration continues from it and late joiners see a knocked-down zombie as silenced.
     private int shotgunHits;
@@ -83,7 +81,7 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
         }
 
         shotgunHits++;
-        if (shotgunHits >= HitsToKnockDown)
+        if (shotgunHits >= ShotgunCombat.HitsToDefeatZombies)
         {
             KnockDown(character);
             return;

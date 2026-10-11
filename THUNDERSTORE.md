@@ -24,7 +24,7 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 
 - **On spawn (optional):** set `GiveShotgunOnSpawn = true` and the **host** puts one shotgun in each scout's hand when they enter the climb or join mid-run (Shore and later — not at the Airport; once per player per run).
 - **Roots:** every run, **at least two random luggage** anywhere on the Roots map are forced to contain a shotgun. No mod config turns it off, but a custom run that disables the shotgun in its item settings gets none.
-- **Other biomes:** luggage outside Roots is locked out only when **Zombies is the sole enabled** `[Shootables]` target. Any other shootables mix (or `CanSpawnOnAnyBiome = true`) allows **RidiculouslyRare** rolls in every biome. Roots still forces two suitcases either way.
+- **Other biomes:** by default every `[Shootables]` target is on, so luggage outside Roots can roll a shotgun (**RidiculouslyRare**). Luggage stays Roots-only only when **Zombies is the sole enabled** shootable (or set `CanSpawnOnAnyBiome = true` to force every biome). Roots still forces two suitcases either way.
 - **Cap:** at most **4** luggage per biome can contain a shotgun in a single run (including Roots).
 - **Campfire ammo:** by default the **host** places ammo piles at each segment campfire (`[AmmoPile] SpawnAtCampfire`). Hold a shotgun with fewer than `Shots` left, interact (**REFILL**), and the magazine fills up to `Shots` (never above). The pile stays. Ammo piles never appear in luggage. Set `SpawnAtCampfire = false` to disable.
 
@@ -43,17 +43,26 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[Shotgun]` | `Recoil` | `5` | Recoil strength in m/s (0–10) |
 | `[AmmoPile]` | `SpawnAtCampfire` | `true` | Host only: place ammo piles at segment campfires |
 | `[AmmoPile]` | `PilesPerCampfire` | `1` | How many piles per campfire (1–8) when spawning is on |
-| `[Combat]` | `FriendlyFire` | `true` | `true` = injure other scouts. `false` = knockback only, no Injury |
+| `[Shootables]` | `Scouts` | `true` | Injure / ragdoll other scouts |
 | `[Shootables]` | `Zombies` | `true` | Hit / knock down zombies |
-| `[Shootables]` | `Mandrake` | `false` | Destroy mandrakes |
-| `[Shootables]` | `Beetles` | `false` | Kill beetles |
-| `[Shootables]` | `Spiders` | `false` | Stun spiders |
-| `[Shootables]` | `Spores` | `false` | Break spore bombs (spore, explosive, poison) / clear spore clouds |
-| `[Shootables]` | `Scorpions` | `false` | Kill scorpions |
-| `[Shootables]` | `Dynamite` | `false` | Light dynamite fuses |
+| `[Shootables]` | `Mandrake` | `true` | Destroy mandrakes |
+| `[Shootables]` | `Beetles` | `true` | Kill beetles |
+| `[Shootables]` | `Spiders` | `true` | Stun spiders |
+| `[Shootables]` | `Spores` | `true` | Break spore bombs (spore, explosive, poison) / clear spore clouds |
+| `[Shootables]` | `Scorpions` | `true` | Kill scorpions |
+| `[Shootables]` | `Dynamite` | `true` | Explode dynamite on hit |
+| `[HitsToDefeat]` | `Zombies` | `2` | Shots to knock down a zombie |
+| `[HitsToDefeat]` | `Mandrake` | `1` | Shots to destroy a mandrake |
+| `[HitsToDefeat]` | `Beetles` | `1` | Shots to kill a beetle |
+| `[HitsToDefeat]` | `Spiders` | `1` | Shots to stun a spider |
+| `[HitsToDefeat]` | `Spores` | `1` | Shots to break a spore bomb / clear a spore cloud |
+| `[HitsToDefeat]` | `Scorpions` | `1` | Shots to kill a scorpion |
+| `[HitsToDefeat]` | `Dynamite` | `1` | Shots to explode dynamite |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
 
-In multiplayer, `Shots`, `FriendlyFire`, and every `[Shootables]` toggle come from the host, so the whole lobby plays by the same rules. Recoil and the hold pose stay per player.
+Scouts are not under `[HitsToDefeat]`: each hit still applies Injury and knockback when `[Shootables] Scouts` is on.
+
+In multiplayer, `Shots`, every `[Shootables]` toggle, and every `[HitsToDefeat]` value come from the host, so the whole lobby plays by the same rules. Recoil and the hold pose stay per player.
 
 The host keeps track of which suitcases gave a shotgun in each run, in `BepInEx/config/PeakShotgun.loot.json`, so the per-biome cap and the Roots picks survive loading a quicksave or the host leaving mid-run.
 

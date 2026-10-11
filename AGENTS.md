@@ -38,7 +38,7 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 | `AmmoPileInteract` / `AmmoPilePatches` | Ground ammo pile: interact while holding an underfilled shotgun → host refill (pile stays). No pickup, no luggage loot |
 | `CampfireAmmoSpawner` | Host-only: when `[AmmoPile] SpawnAtCampfire` is on, places piles around each segment campfire on first `Campfire.OnEnable` |
 | `AmmoPileModelSwap` | Embedded `ammo_pile.obj` + albedo on the ammo-pile prefab |
-| `HostConfigSync` | Publishes the host's `Shots`, `FriendlyFire` and `[Shootables]` as Photon room properties; every client reads those instead of its own config |
+| `HostConfigSync` | Publishes the host's `Shots`, `[Shootables]`, and `[HitsToDefeat]` as Photon room properties; every client reads those instead of its own config |
 | `ShotgunAmmoUI` | Appends the remaining count to the hotbar name (`Item.GetItemName`) and the shoot prompt (`GUIManager.GetMainInteractPrompt`), then refreshes both after a shot |
 | `ShotgunVFX` | A short orange point light, plus a small copy of a smoke effect already in PEAK |
 | `GunPatch` | Adds `GunCharacterLaunch` to every character in `Character.Awake` |
@@ -71,7 +71,7 @@ Recoil is `[Shotgun] EnableRecoil` (default true) and `[Shotgun] Recoil` (streng
 
 A hit calls `Character.Fall` and then `Character.AddForce` once per physics step (`FixedUpdate`) for `ShoveSeconds` (0.3s) at `ShoveAcceleration` (36). Bodypart forces accumulate until the next physics step, so adding it per rendered frame would scale the shove with frame rate. That is one acceleration on the body. Do not switch this to `AddForceAtPosition`. PEAK applies that impulse to every ragdoll bone, which launches the zombie off the map.
 
-The first zombie hit adds Drowsy (0.5) and does not knock them out. The second hit calls `PassOutInstantly` and `HoldDown`. `LateUpdate` keeps them down (`passedOut`, `fullyPassedOut`, Drowsy at 1, `fallSeconds` at least 5) so lunge recovery cannot stand them back up. The game still does not mark them `Dead`. PEAK's own downed timer kills them later.
+Zombie knockdown needs `[HitsToDefeat] Zombies` hits (default 2, host-synced). Hits before that add Drowsy (0.5) and do not knock them out. The defeating hit calls `PassOutInstantly` and `HoldDown`. `LateUpdate` keeps them down (`passedOut`, `fullyPassedOut`, Drowsy at 1, `fallSeconds` at least 5) so lunge recovery cannot stand them back up. The game still does not mark them `Dead`. PEAK's own downed timer kills them later. Other defeatable world targets use the same config section (default 1 each); scouts are not listed and still take Injury every hit.
 
 `KnockDown` silences the zombie and sends the knockdown with `RPC_ZombieShotState`. That sets `Silenced` on every client, stops `AudioSource`s on the zombie, and mutes them. `ZombieSilencePatch` is a Harmony prefix on `MushroomZombie.RPC_PlaySFX`. If `Silenced` is set, the prefix skips the original method, which blocks later grunts, the knockout bark, and bite sounds. `Prepare` skips the patch when that method is missing, so a game update does not fail plugin load.
 

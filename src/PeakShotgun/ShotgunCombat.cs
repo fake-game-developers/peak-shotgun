@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
 using Peak.Afflictions;
@@ -6,6 +7,92 @@ using Photon.Pun;
 using UnityEngine;
 
 namespace Peak.Shotgun;
+
+/// <summary>
+/// Shots needed to defeat each non-scout target. Scouts stay damage-per-shot and are not listed here.
+/// Packed as a 7-byte array for the host room property (order is fixed — do not reorder).
+/// </summary>
+internal readonly struct HitsToDefeatSettings
+{
+    internal const int PackedLength = 7;
+
+    internal const int MaxHits = 20;
+
+    internal HitsToDefeatSettings(
+        int zombies,
+        int mandrake,
+        int beetles,
+        int spiders,
+        int spores,
+        int scorpions,
+        int dynamite)
+    {
+        Zombies = Clamp(zombies);
+        Mandrake = Clamp(mandrake);
+        Beetles = Clamp(beetles);
+        Spiders = Clamp(spiders);
+        Spores = Clamp(spores);
+        Scorpions = Clamp(scorpions);
+        Dynamite = Clamp(dynamite);
+    }
+
+    internal int Zombies { get; }
+
+    internal int Mandrake { get; }
+
+    internal int Beetles { get; }
+
+    internal int Spiders { get; }
+
+    internal int Spores { get; }
+
+    internal int Scorpions { get; }
+
+    internal int Dynamite { get; }
+
+    internal static HitsToDefeatSettings Defaults { get; } = new(2, 1, 1, 1, 1, 1, 1);
+
+    internal int For(ShotTargetKind kind) => kind switch
+    {
+        ShotTargetKind.Spider => Spiders,
+        ShotTargetKind.Beetle => Beetles,
+        ShotTargetKind.Scorpion => Scorpions,
+        ShotTargetKind.Mandrake => Mandrake,
+        ShotTargetKind.Dynamite => Dynamite,
+        ShotTargetKind.SporeBomb or ShotTargetKind.SporeCloud => Spores,
+        _ => 1,
+    };
+
+    internal byte[] ToPacked() =>
+    [
+        (byte)Zombies,
+        (byte)Mandrake,
+        (byte)Beetles,
+        (byte)Spiders,
+        (byte)Spores,
+        (byte)Scorpions,
+        (byte)Dynamite,
+    ];
+
+    internal static HitsToDefeatSettings FromPacked(byte[]? packed)
+    {
+        if (packed == null || packed.Length < PackedLength)
+        {
+            return Defaults;
+        }
+
+        return new HitsToDefeatSettings(
+            packed[0],
+            packed[1],
+            packed[2],
+            packed[3],
+            packed[4],
+            packed[5],
+            packed[6]);
+    }
+
+    internal static int Clamp(int value) => Mathf.Clamp(value, 1, MaxHits);
+}
 
 /// <summary>Shootable target toggles, packed so the host can publish them as one room property.</summary>
 [Flags]
@@ -19,6 +106,7 @@ internal enum ShootTargets
     Spores = 1 << 4,
     Scorpions = 1 << 5,
     Dynamite = 1 << 6,
+    Scouts = 1 << 7,
 }
 
 /// <summary>Non-character targets, as sent to the host in <see cref="Action_Gun.RPC_HostShootTarget"/>.</summary>
@@ -34,13 +122,13 @@ internal enum ShotTargetKind
 }
 
 /// <summary>
-/// Config + hit resolution for what the shotgun can affect (creatures, hazards, friendly fire).
+/// Config + hit resolution for what the shotgun can affect (creatures, hazards, other scouts).
 /// In multiplayer the rules come from the host (<see cref="HostConfigSync"/>), not from each client's config,
 /// and the host applies every non-character hit after re-checking them.
 /// </summary>
 internal static class ShotgunCombat
 {
-    private static ConfigEntry<bool>? friendlyFire;
+    private static ConfigEntry<bool>? shootScouts;
     private static ConfigEntry<bool>? shootZombies;
     private static ConfigEntry<bool>? shootMandrake;
     private static ConfigEntry<bool>? shootBeetles;
@@ -49,21 +137,30 @@ internal static class ShotgunCombat
     private static ConfigEntry<bool>? shootScorpions;
     private static ConfigEntry<bool>? shootDynamite;
 
+    private static ConfigEntry<int>? hitsZombies;
+    private static ConfigEntry<int>? hitsMandrake;
+    private static ConfigEntry<int>? hitsBeetles;
+    private static ConfigEntry<int>? hitsSpiders;
+    private static ConfigEntry<int>? hitsSpores;
+    private static ConfigEntry<int>? hitsScorpions;
+    private static ConfigEntry<int>? hitsDynamite;
+
+    /// <summary>Host-side (or offline) hit counts toward defeat for world targets, keyed by Photon view id or local instance id.</summary>
+    private static readonly Dictionary<int, int> worldHitCounts = new();
+
     private static PropertyInfo? mobStateProperty;
     private static object? mobStateDead;
 
-    /// <summary>This client's own <c>FriendlyFire</c> config (the host publishes it; clients use the host's).</summary>
-    internal static bool LocalFriendlyFire => friendlyFire?.Value ?? true;
-
     /// <summary>This client's own <c>[Shootables]</c> config (the host publishes it; clients use the host's).</summary>
     internal static ShootTargets LocalShootables =>
-        (shootZombies?.Value ?? true ? ShootTargets.Zombies : ShootTargets.None)
-        | (shootMandrake?.Value ?? false ? ShootTargets.Mandrake : ShootTargets.None)
-        | (shootBeetles?.Value ?? false ? ShootTargets.Beetles : ShootTargets.None)
-        | (shootSpiders?.Value ?? false ? ShootTargets.Spiders : ShootTargets.None)
-        | (shootSpores?.Value ?? false ? ShootTargets.Spores : ShootTargets.None)
-        | (shootScorpions?.Value ?? false ? ShootTargets.Scorpions : ShootTargets.None)
-        | (shootDynamite?.Value ?? false ? ShootTargets.Dynamite : ShootTargets.None);
+        (shootScouts?.Value ?? true ? ShootTargets.Scouts : ShootTargets.None)
+        | (shootZombies?.Value ?? true ? ShootTargets.Zombies : ShootTargets.None)
+        | (shootMandrake?.Value ?? true ? ShootTargets.Mandrake : ShootTargets.None)
+        | (shootBeetles?.Value ?? true ? ShootTargets.Beetles : ShootTargets.None)
+        | (shootSpiders?.Value ?? true ? ShootTargets.Spiders : ShootTargets.None)
+        | (shootSpores?.Value ?? true ? ShootTargets.Spores : ShootTargets.None)
+        | (shootScorpions?.Value ?? true ? ShootTargets.Scorpions : ShootTargets.None)
+        | (shootDynamite?.Value ?? true ? ShootTargets.Dynamite : ShootTargets.None);
 
     /// <summary>
     /// True when Zombies is the only enabled shootable. That is the only shootables mix that keeps
@@ -71,7 +168,7 @@ internal static class ShotgunCombat
     /// </summary>
     internal static bool IsZombiesOnlyShootables => LocalShootables == ShootTargets.Zombies;
 
-    internal static bool FriendlyFire => HostConfigSync.FriendlyFire;
+    internal static bool CanShootScouts => Allows(ShootTargets.Scouts);
 
     internal static bool CanShootZombies => Allows(ShootTargets.Zombies);
 
@@ -86,6 +183,19 @@ internal static class ShotgunCombat
     internal static bool CanShootScorpions => Allows(ShootTargets.Scorpions);
 
     internal static bool CanShootDynamite => Allows(ShootTargets.Dynamite);
+
+    /// <summary>This client's own <c>[HitsToDefeat]</c> config (the host publishes it; clients use the host's).</summary>
+    internal static HitsToDefeatSettings LocalHitsToDefeat => new(
+        hitsZombies?.Value ?? 2,
+        hitsMandrake?.Value ?? 1,
+        hitsBeetles?.Value ?? 1,
+        hitsSpiders?.Value ?? 1,
+        hitsSpores?.Value ?? 1,
+        hitsScorpions?.Value ?? 1,
+        hitsDynamite?.Value ?? 1);
+
+    /// <summary>Shots needed to knock down a zombie (host-synced).</summary>
+    internal static int HitsToDefeatZombies => HostConfigSync.HitsToDefeat.Zombies;
 
     private static bool Allows(ShootTargets target) => (HostConfigSync.Shootables & target) != 0;
 
@@ -102,20 +212,30 @@ internal static class ShotgunCombat
 
     internal static void Bind(ConfigFile config)
     {
-        friendlyFire = config.Bind(
-            "Combat",
-            "FriendlyFire",
-            true,
-            "If true, shotguns injure other scouts. If false, hits still ragdoll / shove them but deal no Injury. Host's value is used in multiplayer.");
-
+        shootScouts = config.Bind("Shootables", "Scouts", true, "Shotguns can injure and ragdoll other scouts. Host's value is used in multiplayer.");
         shootZombies = config.Bind("Shootables", "Zombies", true, "Shotguns can hit and knock down zombies. Host's value is used in multiplayer.");
-        shootMandrake = config.Bind("Shootables", "Mandrake", false, "Shotguns can destroy mandrakes. Host's value is used in multiplayer.");
-        shootBeetles = config.Bind("Shootables", "Beetles", false, "Shotguns can kill beetles. Host's value is used in multiplayer.");
-        shootSpiders = config.Bind("Shootables", "Spiders", false, "Shotguns can stun spiders (same as throwing an item at them). Host's value is used in multiplayer.");
-        shootSpores = config.Bind("Shootables", "Spores", false, "Shotguns can break spore bombs (spore, explosive, and poison) and clear spore clouds. Host's value is used in multiplayer.");
-        shootScorpions = config.Bind("Shootables", "Scorpions", false, "Shotguns can kill scorpions. Host's value is used in multiplayer.");
-        shootDynamite = config.Bind("Shootables", "Dynamite", false, "Shotguns can light dynamite fuses. Host's value is used in multiplayer.");
+        shootMandrake = config.Bind("Shootables", "Mandrake", true, "Shotguns can destroy mandrakes. Host's value is used in multiplayer.");
+        shootBeetles = config.Bind("Shootables", "Beetles", true, "Shotguns can kill beetles. Host's value is used in multiplayer.");
+        shootSpiders = config.Bind("Shootables", "Spiders", true, "Shotguns can stun spiders (same as throwing an item at them). Host's value is used in multiplayer.");
+        shootSpores = config.Bind("Shootables", "Spores", true, "Shotguns can break spore bombs (spore, explosive, and poison) and clear spore clouds. Host's value is used in multiplayer.");
+        shootScorpions = config.Bind("Shootables", "Scorpions", true, "Shotguns can kill scorpions. Host's value is used in multiplayer.");
+        shootDynamite = config.Bind("Shootables", "Dynamite", true, "Shotguns can explode dynamite on hit. Host's value is used in multiplayer.");
+
+        ConfigDescription hitsDesc(string what) => new(
+            $"Shots needed to {what}. Host's value is used in multiplayer. Scouts are not listed — they take Injury every hit.",
+            new AcceptableValueRange<int>(1, HitsToDefeatSettings.MaxHits));
+
+        hitsZombies = config.Bind("HitsToDefeat", "Zombies", 2, hitsDesc("knock down a zombie"));
+        hitsMandrake = config.Bind("HitsToDefeat", "Mandrake", 1, hitsDesc("destroy a mandrake"));
+        hitsBeetles = config.Bind("HitsToDefeat", "Beetles", 1, hitsDesc("kill a beetle"));
+        hitsSpiders = config.Bind("HitsToDefeat", "Spiders", 1, hitsDesc("stun a spider"));
+        hitsSpores = config.Bind("HitsToDefeat", "Spores", 1, hitsDesc("break a spore bomb or clear a spore cloud"));
+        hitsScorpions = config.Bind("HitsToDefeat", "Scorpions", 1, hitsDesc("kill a scorpion"));
+        hitsDynamite = config.Bind("HitsToDefeat", "Dynamite", 1, hitsDesc("explode dynamite"));
     }
+
+    /// <summary>Clears host/offline world-target hit progress (map change / leave room).</summary>
+    internal static void ClearWorldHitCounts() => worldHitCounts.Clear();
 
     /// <summary>
     /// Applies the shotgun hit to whatever is under the collider, if that target is enabled.
@@ -148,7 +268,10 @@ internal static class ShotgunCombat
         PhotonView? view = ViewOf(target);
         if (!PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient || view == null)
         {
-            Apply(target, kind, view);
+            if (RegisterWorldHitTowardDefeat(target, kind, view))
+            {
+                Apply(target, kind, view);
+            }
         }
         else
         {
@@ -278,10 +401,37 @@ internal static class ShotgunCombat
 
         // The view must be the target's own, so a forged id cannot destroy some larger object that merely
         // contains a mandrake or spore emitter.
-        if (target != null && ViewOf(target) == view)
+        if (target != null && ViewOf(target) == view && RegisterWorldHitTowardDefeat(target, kind, view))
         {
             Apply(target, kind, view);
         }
+    }
+
+    /// <summary>
+    /// Counts this pellet toward defeating a world target. True when the hit count has reached
+    /// <see cref="HitsToDefeatSettings"/> for that kind (then the counter is cleared).
+    /// </summary>
+    private static bool RegisterWorldHitTowardDefeat(Component target, ShotTargetKind kind, PhotonView? view)
+    {
+        int need = HostConfigSync.HitsToDefeat.For(kind);
+        if (need <= 1)
+        {
+            return true;
+        }
+
+        int key = view != null && view.ViewID != 0
+            ? view.ViewID
+            : unchecked((int)0x80000000) ^ target.GetInstanceID();
+        worldHitCounts.TryGetValue(key, out int hits);
+        hits++;
+        if (hits >= need)
+        {
+            worldHitCounts.Remove(key);
+            return true;
+        }
+
+        worldHitCounts[key] = hits;
+        return false;
     }
 
     private static PhotonView? ViewOf(Component target) =>
@@ -314,7 +464,7 @@ internal static class ShotgunCombat
                 KillMob((Mob)target);
                 break;
             case ShotTargetKind.Dynamite:
-                ((Dynamite)target).LightFlare();
+                ExplodeDynamite((Dynamite)target);
                 break;
             case ShotTargetKind.SporeBomb:
                 BreakSporeBomb((Breakable)target);
@@ -347,6 +497,34 @@ internal static class ShotgunCombat
         }
 
         return target.gameObject;
+    }
+
+    /// <summary>
+    /// Same path as a burnt-out fuse: <see cref="Dynamite.RPC_Explode"/> on everyone, then destroy the item.
+    /// </summary>
+    private static void ExplodeDynamite(Dynamite dynamite)
+    {
+        if (dynamite == null)
+        {
+            return;
+        }
+
+        PhotonView? view = dynamite.photonView != null
+            ? dynamite.photonView
+            : dynamite.GetComponent<PhotonView>();
+        if (PhotonNetwork.InRoom && view != null && view.ViewID != 0)
+        {
+            view.RPC(nameof(Dynamite.RPC_Explode), RpcTarget.All);
+            PhotonNetwork.Destroy(view.gameObject);
+        }
+        else
+        {
+            dynamite.RPC_Explode();
+            UnityEngine.Object.Destroy(dynamite.gameObject);
+        }
+
+        Item? item = dynamite.item != null ? dynamite.item : dynamite.GetComponent<Item>();
+        item?.ClearDataFromBackpack();
     }
 
     /// <summary>
@@ -388,7 +566,11 @@ internal static class ShotgunCombat
             return true;
         }
 
-        // Scouts: always impact; Injury only when FriendlyFire is on.
+        if (!CanShootScouts)
+        {
+            return false;
+        }
+
         gun.photonView.RPC(nameof(Action_Gun.RPC_GunImpact), RpcTarget.All, character.photonView.Owner, hitPoint, direction, shotId);
         return true;
     }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.16
+
+- All `[Shootables]` toggles default on (scouts, zombies, mandrake, beetles, spiders, spores, scorpions, dynamite)
+- Replace `[Combat] FriendlyFire` with `[Shootables] Scouts` (off = pellets ignore other scouts; no knockback-only mode)
+- Host syncs shootables as one bitmask only (no separate friendly-fire room property)
+- With defaults on, luggage rare rolls unlock in every biome (Roots-only luggage only when Zombies is the sole enabled shootable)
+- Note: an existing `PeakShotgun.cfg` keeps prior `[Shootables]` values until you change them; new keys (e.g. `Scouts`) use the new defaults
+- Add `[HitsToDefeat]` (host-synced): zombies default 2, other defeatable targets default 1; scouts stay Injury every hit
+- Shooting dynamite explodes it immediately (no fuse light)
+
 ## 1.0.15
 
 - Improve the held shotgun pose: gun sits further forward and lower so the right arm is less cramped
