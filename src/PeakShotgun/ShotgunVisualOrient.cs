@@ -56,6 +56,9 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
         {
             transform.localPosition = Plugin.HeldLocalPosition;
             transform.localRotation = Plugin.HeldLocalRotation;
+            // Live every frame — defaultPos used to be written only on PoseVersion bump, so editing
+            // GunHeight / Side / HoldForward in the .cfg often looked like it did nothing until re-equip.
+            item!.defaultPos = Plugin.HeldDefaultPos;
             if (justHeld)
             {
                 LogHeldGeometry();

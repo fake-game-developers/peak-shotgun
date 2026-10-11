@@ -76,8 +76,8 @@ internal static class ShotgunModelSwap
 
     /// <summary>
     /// PEAK attaches each hand to direct children named Hand_R / Hand_L (position AND rotation), and holds
-    /// the item root at <c>Item.defaultPos</c>. Put the grip at the root, the pump ahead of it, and turn
-    /// each hand to wrap its part. The blowgun rotations we clone are for a tube held at the mouth.
+    /// the item root at <c>Item.defaultPos</c>. Right hand on the rear grip (at the item origin), left hand
+    /// under the wooden pump. The blowgun rotations we clone are for a tube held at the mouth.
     /// </summary>
     internal static void PlaceHandAnchors(GameObject gunObject, Mesh mesh, bool log = true)
     {
@@ -104,21 +104,27 @@ internal static class ShotgunModelSwap
 
         Vector3 ToItem(Vector3 meshLocal) => heldPos + heldRot * (meshLocal * scale);
 
-        // PEAK's CharacterItems.AttachItem / UpdateAttachedItem snap the scout's Hand_R bone
-        // (BodypartType 10) to this item's "Hand_R" child and Hand_L (7) to "Hand_L" — no swapping.
-        // The right hand holds the grip / trigger, the left hand reaches forward to the pump.
+        // PEAK's CharacterItems.AttachItem snaps Hand_R / Hand_L bones to these children (no swapping).
+        // Right hand = rear grip / trigger. Left hand = wooden pump.
         if (handR != null)
         {
-            Quaternion rightRot = Plugin.HeldAim * Quaternion.Euler(-Plugin.RightWristTilt, 0f, 0f) * RightGripRotation;
+            Vector3 gripCenter = ToItem(gripMesh);
+            // FIXED: +45° tip DOWN about item +X onto the pistol grip. Do not flip this to tip-up.
+            Quaternion rightRot = Plugin.HeldAim
+                * Quaternion.Euler(Plugin.RightWristDown, 0f, 0f)
+                * RightGripRotation;
             handR.localRotation = rightRot;
-            // The anchor is the hand BONE (wrist end), not the palm: the fist closes GripReach along the fingers.
-            handR.localPosition = ToItem(gripMesh) - rightRot * (Vector3.up * GripReach);
+            handR.localPosition = gripCenter - rightRot * (Vector3.up * GripReach);
         }
 
         if (handL != null)
         {
-            handL.localPosition = ToItem(forendMesh) + Plugin.HeldAim * (Vector3.left * Plugin.LeftHandLeft);
-            handL.localRotation = Plugin.HeldAim * LeftPumpRotation;
+            // Onto the pump axis and up into the wood (not floating out beside / below it).
+            Vector3 pumpCenter = ToItem(forendMesh)
+                + Plugin.HeldAim * new Vector3(-Plugin.LeftHandIn, Plugin.LeftHandUp, 0f);
+            Quaternion leftRot = Plugin.HeldAim * LeftPumpRotation;
+            handL.localRotation = leftRot;
+            handL.localPosition = pumpCenter - leftRot * (Vector3.up * GripReach);
         }
 
         if (gunObject.TryGetComponent(out Item item))
@@ -129,22 +135,21 @@ internal static class ShotgunModelSwap
         if (log)
         {
             Plugin.Log.LogInfo(
-                $"Shotgun hand anchors: grip(Hand_R)={handR?.localPosition}, forend(Hand_L)={handL?.localPosition}, defaultPos={Plugin.HeldDefaultPos}.");
+                $"Shotgun hand anchors: grip(Hand_R)={handR?.localPosition}, pump(Hand_L)={handL?.localPosition}, defaultPos={Plugin.HeldDefaultPos}.");
         }
     }
 
     // Scout hand bones: forward = thumb side of the fist (the gripped axis), up = the fingers,
     // right = palm normal on the right hand (checked against vanilla Torch / Honeycomb / RopeShooter anchors).
-    // Right: the vanilla RopeShooter's Hand_R (upright pistol grip), then tipped by RightWristTiltDegrees.
-    // A thumb-forward rifle-wrist fist points the fingers down, which brings the forearm in from above.
+    // Right: RopeShooter Hand_R, then RightWristDownDegrees tips the fist 45° DOWN onto the grip.
     private static readonly Quaternion RightGripRotation = new(-0.108f, 0.658f, 0.677f, 0.311f);
 
     // Metres from the hand bone to the centre of the bar it grips, along the fingers axis. Vanilla anchors
     // around a centred shaft: Torch R 0.134, Torch L 0.160, RopeShooter R 0.141; ~0 along the palm normal.
     private const float GripReach = 0.14f;
 
-    // Left: thumb along the barrel toward the muzzle, palm up under the pump, fingers wrapping up its right side.
-    private static readonly Quaternion LeftPumpRotation = Quaternion.LookRotation(Vector3.forward, new Vector3(1f, 0.4f, 0f));
+    // Left: thumb along the barrel, palm under the pump, fingers wrapping up around the wood.
+    private static readonly Quaternion LeftPumpRotation = Quaternion.LookRotation(Vector3.forward, new Vector3(0.6f, 1f, 0f));
 
     private static Material? FindPeakMaterial(GameObject gunObject)
     {

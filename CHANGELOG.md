@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.15
+
+- Improve the held shotgun pose: gun sits further forward and lower so the right arm is less cramped
+- Right hand tips 45° down onto the pistol grip (`RightWristDownDegrees`); left hand sits on the pump (`LeftHandIn` / `LeftHandUp`, default up `0.04`)
+- Hold pose config renames: `HoldForward` (was `Reach`), plus live `GunHeight` / `Side` / `HoldForward` updates while holding
+- Seat the held gun a fixed reach from the right shoulder every frame so it no longer glues to the chest
+
 ## 1.0.14
 
 - Enable `[AmmoPile] SpawnAtCampfire` by default

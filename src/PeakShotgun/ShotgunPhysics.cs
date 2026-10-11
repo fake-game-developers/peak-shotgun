@@ -331,30 +331,46 @@ internal static class ShotgunItemStatePatch
 }
 
 /// <summary>
-/// While equipping, <c>CharacterItems.Equip</c> places the item at <c>GetItemHoldPos(item, pushOffTerrain: true)</c>
-/// and then teleports both hand bones onto its anchors and joins them there. Our hold target sits 1.3-1.5 m out, far
-/// past arm's reach, so the arms snap back and can fling the gun through the body, where the torso traps the arms
-/// (gun inside the chest, muzzle out the front). The held pose is not networked: every client runs this for every
-/// holder, so remote scouts land in that trap on their own. Vanilla's terrain push only pulls toward the hip, which
-/// traps it too. Seat the gun <see cref="EquipReach"/> from the right shoulder toward the target instead; the hold
-/// force then straightens the arms out. Held colliders are triggers, so terrain needs no push.
+/// PEAK's unpushed hold target sits 1.3–1.5 m out (past arm reach). Vanilla terrain push and a short
+/// max-clamp both park the grip on the chest; with the right wrist tipped 45° down that forces a
+/// sky-high elbow. Always seat the shotgun a fixed <see cref="HoldReach"/> from the right shoulder
+/// toward the look target so HoldItem keeps pulling the gun forward every physics step.
 /// </summary>
 [HarmonyPatch(typeof(CharacterItems), nameof(CharacterItems.GetItemHoldPos))]
 internal static class ShotgunHoldPosPatch
 {
-    // Roughly where the right hand settles in a good hold (shoulder → grip ≈ 0.35 m in the equip log).
-    private const float EquipReach = 0.35f;
+    // Shoulder → grip. Logs showed ~0.37 m (chest-glued). ~0.82 m leaves room for tip-down without a chicken-wing.
+    private const float HoldReach = 0.82f;
+
+    private static bool seating;
 
     [HarmonyPostfix]
-    private static void SeatWithinReach(CharacterItems __instance, Item item, bool pushOffTerrain, ref Vector3 __result)
+    private static void SeatAtArmReach(CharacterItems __instance, Item item, bool pushOffTerrain, ref Vector3 __result)
     {
-        if (!pushOffTerrain || item == null || item.GetComponent<ShotgunInstanceSetup>() == null)
+        if (seating || item == null || item.GetComponent<ShotgunInstanceSetup>() == null)
         {
             return;
         }
 
-        Vector3 shoulder = __instance.character.GetBodypart(BodypartType.Arm_R).transform.position;
-        Vector3 target = __instance.GetItemHoldPos(item, pushOffTerrain: false);
-        __result = shoulder + Vector3.ClampMagnitude(target - shoulder, EquipReach);
+        seating = true;
+        try
+        {
+            Vector3 shoulder = __instance.character.GetBodypart(BodypartType.Arm_R).transform.position;
+            // Unpushed look-space target (defaultPos). Do not use __result — terrain push / prior clamps pull it in.
+            Vector3 target = __instance.GetItemHoldPos(item, pushOffTerrain: false);
+            Vector3 offset = target - shoulder;
+            float dist = offset.magnitude;
+            if (dist < 1e-4f)
+            {
+                __result = shoulder + __instance.character.data.lookDirection * HoldReach;
+                return;
+            }
+
+            __result = shoulder + offset * (HoldReach / dist);
+        }
+        finally
+        {
+            seating = false;
+        }
     }
 }
