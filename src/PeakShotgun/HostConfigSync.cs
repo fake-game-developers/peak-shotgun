@@ -146,7 +146,8 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
         && a.Spiders == b.Spiders
         && a.Spores == b.Spores
         && a.Scorpions == b.Scorpions
-        && a.Dynamite == b.Dynamite;
+        && a.Dynamite == b.Dynamite
+        && a.Scoutmaster == b.Scoutmaster;
 
     private static void ClearHostSettings()
     {

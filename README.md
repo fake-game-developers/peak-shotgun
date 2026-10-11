@@ -51,6 +51,7 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[Shootables]` | `Spores` | `true` | Break spore bombs (spore, explosive, poison) / clear spore clouds |
 | `[Shootables]` | `Scorpions` | `true` | Kill scorpions |
 | `[Shootables]` | `Dynamite` | `true` | Explode dynamite on hit |
+| `[Shootables]` | `Scoutmaster` | `true` | Drive off Scoutmaster Myres after enough hits |
 | `[HitsToDefeat]` | `Zombies` | `2` | Shots to knock down a zombie |
 | `[HitsToDefeat]` | `Mandrake` | `1` | Shots to destroy a mandrake |
 | `[HitsToDefeat]` | `Beetles` | `1` | Shots to kill a beetle |
@@ -58,9 +59,10 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[HitsToDefeat]` | `Spores` | `1` | Shots to break a spore bomb / clear a spore cloud |
 | `[HitsToDefeat]` | `Scorpions` | `1` | Shots to kill a scorpion |
 | `[HitsToDefeat]` | `Dynamite` | `1` | Shots to explode dynamite |
+| `[HitsToDefeat]` | `Scoutmaster` | `4` | Shots to drive off the Scoutmaster |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
 
-Scouts are not under `[HitsToDefeat]`: each hit still applies Injury and knockback when `[Shootables] Scouts` is on.
+Fellow scouts are not under `[HitsToDefeat]`: each hit still applies Injury and knockback when `[Shootables] Scouts` is on.
 
 In multiplayer, `Shots`, every `[Shootables]` toggle, and every `[HitsToDefeat]` value come from the host, so the whole lobby plays by the same rules. Recoil and the hold pose stay per player.
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.17
+
+- Add `[Shootables] Scoutmaster` (default on) and `[HitsToDefeat] Scoutmaster` (default 4): after enough hits he clears aggro and warps to the hidey spot
+- Scoutmaster does not count toward unlocking all-biome luggage (Zombies-only Roots rule still holds with Scoutmaster on)
+
 ## 1.0.16
 
 - All `[Shootables]` toggles default on (scouts, zombies, mandrake, beetles, spiders, spores, scorpions, dynamite)

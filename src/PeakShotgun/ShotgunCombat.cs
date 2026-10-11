@@ -9,12 +9,15 @@ using UnityEngine;
 namespace Peak.Shotgun;
 
 /// <summary>
-/// Shots needed to defeat each non-scout target. Scouts stay damage-per-shot and are not listed here.
-/// Packed as a 7-byte array for the host room property (order is fixed — do not reorder).
+/// Shots needed to defeat each non-scout target. Fellow scouts stay damage-per-shot and are not listed here.
+/// Packed as a byte array for the host room property (order is fixed — do not reorder; append only).
 /// </summary>
 internal readonly struct HitsToDefeatSettings
 {
-    internal const int PackedLength = 7;
+    /// <summary>Bytes written by current builds. Older hosts may publish only 7.</summary>
+    internal const int PackedLength = 8;
+
+    internal const int LegacyPackedLength = 7;
 
     internal const int MaxHits = 20;
 
@@ -25,7 +28,8 @@ internal readonly struct HitsToDefeatSettings
         int spiders,
         int spores,
         int scorpions,
-        int dynamite)
+        int dynamite,
+        int scoutmaster)
     {
         Zombies = Clamp(zombies);
         Mandrake = Clamp(mandrake);
@@ -34,6 +38,7 @@ internal readonly struct HitsToDefeatSettings
         Spores = Clamp(spores);
         Scorpions = Clamp(scorpions);
         Dynamite = Clamp(dynamite);
+        Scoutmaster = Clamp(scoutmaster);
     }
 
     internal int Zombies { get; }
@@ -50,7 +55,9 @@ internal readonly struct HitsToDefeatSettings
 
     internal int Dynamite { get; }
 
-    internal static HitsToDefeatSettings Defaults { get; } = new(2, 1, 1, 1, 1, 1, 1);
+    internal int Scoutmaster { get; }
+
+    internal static HitsToDefeatSettings Defaults { get; } = new(2, 1, 1, 1, 1, 1, 1, 4);
 
     internal int For(ShotTargetKind kind) => kind switch
     {
@@ -60,6 +67,7 @@ internal readonly struct HitsToDefeatSettings
         ShotTargetKind.Mandrake => Mandrake,
         ShotTargetKind.Dynamite => Dynamite,
         ShotTargetKind.SporeBomb or ShotTargetKind.SporeCloud => Spores,
+        ShotTargetKind.Scoutmaster => Scoutmaster,
         _ => 1,
     };
 
@@ -72,11 +80,12 @@ internal readonly struct HitsToDefeatSettings
         (byte)Spores,
         (byte)Scorpions,
         (byte)Dynamite,
+        (byte)Scoutmaster,
     ];
 
     internal static HitsToDefeatSettings FromPacked(byte[]? packed)
     {
-        if (packed == null || packed.Length < PackedLength)
+        if (packed == null || packed.Length < LegacyPackedLength)
         {
             return Defaults;
         }
@@ -88,7 +97,8 @@ internal readonly struct HitsToDefeatSettings
             packed[3],
             packed[4],
             packed[5],
-            packed[6]);
+            packed[6],
+            packed.Length >= PackedLength ? packed[7] : 4);
     }
 
     internal static int Clamp(int value) => Mathf.Clamp(value, 1, MaxHits);
@@ -107,9 +117,10 @@ internal enum ShootTargets
     Scorpions = 1 << 5,
     Dynamite = 1 << 6,
     Scouts = 1 << 7,
+    Scoutmaster = 1 << 8,
 }
 
-/// <summary>Non-character targets, as sent to the host in <see cref="Action_Gun.RPC_HostShootTarget"/>.</summary>
+/// <summary>Non-player targets, as sent to the host in <see cref="Action_Gun.RPC_HostShootTarget"/>.</summary>
 internal enum ShotTargetKind
 {
     Spider = 1,
@@ -119,6 +130,7 @@ internal enum ShotTargetKind
     Dynamite = 5,
     SporeBomb = 6,
     SporeCloud = 7,
+    Scoutmaster = 8,
 }
 
 /// <summary>
@@ -136,6 +148,7 @@ internal static class ShotgunCombat
     private static ConfigEntry<bool>? shootSpores;
     private static ConfigEntry<bool>? shootScorpions;
     private static ConfigEntry<bool>? shootDynamite;
+    private static ConfigEntry<bool>? shootScoutmaster;
 
     private static ConfigEntry<int>? hitsZombies;
     private static ConfigEntry<int>? hitsMandrake;
@@ -144,6 +157,7 @@ internal static class ShotgunCombat
     private static ConfigEntry<int>? hitsSpores;
     private static ConfigEntry<int>? hitsScorpions;
     private static ConfigEntry<int>? hitsDynamite;
+    private static ConfigEntry<int>? hitsScoutmaster;
 
     /// <summary>Host-side (or offline) hit counts toward defeat for world targets, keyed by Photon view id or local instance id.</summary>
     private static readonly Dictionary<int, int> worldHitCounts = new();
@@ -160,13 +174,16 @@ internal static class ShotgunCombat
         | (shootSpiders?.Value ?? true ? ShootTargets.Spiders : ShootTargets.None)
         | (shootSpores?.Value ?? true ? ShootTargets.Spores : ShootTargets.None)
         | (shootScorpions?.Value ?? true ? ShootTargets.Scorpions : ShootTargets.None)
-        | (shootDynamite?.Value ?? true ? ShootTargets.Dynamite : ShootTargets.None);
+        | (shootDynamite?.Value ?? true ? ShootTargets.Dynamite : ShootTargets.None)
+        | (shootScoutmaster?.Value ?? true ? ShootTargets.Scoutmaster : ShootTargets.None);
 
     /// <summary>
-    /// True when Zombies is the only enabled shootable. That is the only shootables mix that keeps
-    /// luggage Roots-exclusive (unless <c>CanSpawnOnAnyBiome</c> forces every biome).
+    /// True when Zombies is the only loot-relevant enabled shootable. Scoutmaster does not unlock
+    /// all-biome luggage. That mix (or Zombies alone) keeps luggage Roots-exclusive unless
+    /// <c>CanSpawnOnAnyBiome</c> forces every biome.
     /// </summary>
-    internal static bool IsZombiesOnlyShootables => LocalShootables == ShootTargets.Zombies;
+    internal static bool IsZombiesOnlyShootables =>
+        (LocalShootables & ~ShootTargets.Scoutmaster) == ShootTargets.Zombies;
 
     internal static bool CanShootScouts => Allows(ShootTargets.Scouts);
 
@@ -184,6 +201,8 @@ internal static class ShotgunCombat
 
     internal static bool CanShootDynamite => Allows(ShootTargets.Dynamite);
 
+    internal static bool CanShootScoutmaster => Allows(ShootTargets.Scoutmaster);
+
     /// <summary>This client's own <c>[HitsToDefeat]</c> config (the host publishes it; clients use the host's).</summary>
     internal static HitsToDefeatSettings LocalHitsToDefeat => new(
         hitsZombies?.Value ?? 2,
@@ -192,7 +211,8 @@ internal static class ShotgunCombat
         hitsSpiders?.Value ?? 1,
         hitsSpores?.Value ?? 1,
         hitsScorpions?.Value ?? 1,
-        hitsDynamite?.Value ?? 1);
+        hitsDynamite?.Value ?? 1,
+        hitsScoutmaster?.Value ?? 4);
 
     /// <summary>Shots needed to knock down a zombie (host-synced).</summary>
     internal static int HitsToDefeatZombies => HostConfigSync.HitsToDefeat.Zombies;
@@ -207,6 +227,7 @@ internal static class ShotgunCombat
         ShotTargetKind.Mandrake => CanShootMandrake,
         ShotTargetKind.Dynamite => CanShootDynamite,
         ShotTargetKind.SporeBomb or ShotTargetKind.SporeCloud => CanShootSpores,
+        ShotTargetKind.Scoutmaster => CanShootScoutmaster,
         _ => false,
     };
 
@@ -220,9 +241,10 @@ internal static class ShotgunCombat
         shootSpores = config.Bind("Shootables", "Spores", true, "Shotguns can break spore bombs (spore, explosive, and poison) and clear spore clouds. Host's value is used in multiplayer.");
         shootScorpions = config.Bind("Shootables", "Scorpions", true, "Shotguns can kill scorpions. Host's value is used in multiplayer.");
         shootDynamite = config.Bind("Shootables", "Dynamite", true, "Shotguns can explode dynamite on hit. Host's value is used in multiplayer.");
+        shootScoutmaster = config.Bind("Shootables", "Scoutmaster", true, "Shotguns can drive off Scoutmaster Myres after enough hits. Host's value is used in multiplayer.");
 
         ConfigDescription hitsDesc(string what) => new(
-            $"Shots needed to {what}. Host's value is used in multiplayer. Scouts are not listed — they take Injury every hit.",
+            $"Shots needed to {what}. Host's value is used in multiplayer. Fellow scouts are not listed — they take Injury every hit.",
             new AcceptableValueRange<int>(1, HitsToDefeatSettings.MaxHits));
 
         hitsZombies = config.Bind("HitsToDefeat", "Zombies", 2, hitsDesc("knock down a zombie"));
@@ -232,6 +254,7 @@ internal static class ShotgunCombat
         hitsSpores = config.Bind("HitsToDefeat", "Spores", 1, hitsDesc("break a spore bomb or clear a spore cloud"));
         hitsScorpions = config.Bind("HitsToDefeat", "Scorpions", 1, hitsDesc("kill a scorpion"));
         hitsDynamite = config.Bind("HitsToDefeat", "Dynamite", 1, hitsDesc("explode dynamite"));
+        hitsScoutmaster = config.Bind("HitsToDefeat", "Scoutmaster", 4, hitsDesc("drive off the Scoutmaster"));
     }
 
     /// <summary>Clears host/offline world-target hit progress (map change / leave room).</summary>
@@ -396,6 +419,7 @@ internal static class ShotgunCombat
             ShotTargetKind.Dynamite => Near<Dynamite>(root),
             ShotTargetKind.SporeBomb => Near<Breakable>(root) is { } breakable && IsSporeBomb(breakable) ? breakable : null,
             ShotTargetKind.SporeCloud => Near<StatusEmitter>(root) is { } emitter && IsSporeCloud(emitter) ? emitter : null,
+            ShotTargetKind.Scoutmaster => Near<Scoutmaster>(root),
             _ => null,
         };
 
@@ -481,6 +505,9 @@ internal static class ShotgunCombat
                 }
 
                 break;
+            case ShotTargetKind.Scoutmaster:
+                DismissScoutmaster((Scoutmaster)target);
+                break;
         }
     }
 
@@ -540,6 +567,11 @@ internal static class ShotgunCombat
 
     private static bool TryHitCharacter(Character character, Action_Gun gun, int shotId, Vector3 hitPoint, Vector3 direction)
     {
+        if (character.isScoutmaster)
+        {
+            return TryHitScoutmaster(character, gun, shotId);
+        }
+
         if (GunCharacterLaunch.IsZombie(character))
         {
             if (!CanShootZombies)
@@ -573,6 +605,63 @@ internal static class ShotgunCombat
 
         gun.photonView.RPC(nameof(Action_Gun.RPC_GunImpact), RpcTarget.All, character.photonView.Owner, hitPoint, direction, shotId);
         return true;
+    }
+
+    /// <summary>
+    /// Host counts hits toward <see cref="HitsToDefeatSettings.Scoutmaster"/>, then warps him to the hidey spot
+    /// (same as vanilla <see cref="Scoutmaster.TeleportFarAway"/>) and clears aggro.
+    /// </summary>
+    private static bool TryHitScoutmaster(Character character, Action_Gun gun, int shotId)
+    {
+        if (!CanShootScoutmaster)
+        {
+            return false;
+        }
+
+        Scoutmaster? scoutmaster = character.GetComponent<Scoutmaster>();
+        if (scoutmaster == null)
+        {
+            return false;
+        }
+
+        PhotonView? view = ViewOf(scoutmaster);
+        if (!PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient || view == null)
+        {
+            if (RegisterWorldHitTowardDefeat(scoutmaster, ShotTargetKind.Scoutmaster, view))
+            {
+                DismissScoutmaster(scoutmaster);
+            }
+        }
+        else
+        {
+            gun.photonView.RPC(
+                nameof(Action_Gun.RPC_HostShootTarget),
+                RpcTarget.MasterClient,
+                view.ViewID,
+                (int)ShotTargetKind.Scoutmaster,
+                shotId);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Clears the Scoutmaster's target, warps him to <see cref="Character.ScoutmasterHideySpot"/>, and chills
+    /// AI so he does not immediately re-aggro.
+    /// </summary>
+    private static void DismissScoutmaster(Scoutmaster scoutmaster)
+    {
+        if (scoutmaster == null)
+        {
+            return;
+        }
+
+        scoutmaster.SetCurrentTarget(null, 0f);
+        scoutmaster.discovered = null;
+        scoutmaster.chillForSeconds = 120f;
+        scoutmaster.tpCounter = 5f;
+        scoutmaster.TeleportFarAway();
+        Plugin.Log.LogInfo("Scoutmaster dismissed after shotgun hits (warped to hidey spot).");
     }
 
     /// <summary>
