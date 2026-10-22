@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.18
+
+- Campfire ammo piles now has a proper in-game icon
+
 ## 1.0.17
 
 - Add `[Shootables] Scoutmaster` (default on) and `[HitsToDefeat] Scoutmaster` (default 4): after enough hits he clears aggro and warps to the hidey spot

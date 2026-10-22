@@ -13,7 +13,8 @@ The gun is not a new model. `Plugin.CreateFromBlowgun` waits for PEAK's item cat
 | `src/PeakShotgun/` | All gameplay code |
 | `src-mesh/` | Shotgun FBX + textures; `build_mesh.py` → `src/PeakShotgun/models/` (see `models/README.md`) |
 | `src/PeakShotgun/models/` | Only `shotgun.obj` + `shotgun_albedo_1k.png` are embedded in the DLL |
-| `src/PeakShotgun/icons/ShotgunIcon.png` | Hotbar icon, embedded in the DLL |
+| `src/PeakShotgun/icons/ShotgunIcon.png` | Shotgun hotbar icon, embedded in the DLL |
+| `src/PeakShotgun/icons/AmmoIcon.png` | Ammo pile in-game icon, embedded in the DLL |
 | `src/PeakShotgun/icons/Melon.png` | Unused earlier test icon. Not embedded |
 | `src/PeakShotgun/sounds/shotgun_fire_01.wav` | Shot fire sound. Embedded |
 | `src/PeakShotgun/thunderstore.toml` | Thunderstore listing. `icon.png` at the repo root is the store icon, not the in-game one |
@@ -22,6 +23,7 @@ The gun is not a new model. `Plugin.CreateFromBlowgun` waits for PEAK's item cat
 Embedded resource names are set in `Peak.Shotgun.csproj` and must match the `GetManifestResourceStream` strings in `Plugin.cs`:
 
 - `Peak.Shotgun.icons.ShotgunIcon.png`
+- `Peak.Shotgun.icons.AmmoIcon.png`
 - `Peak.Shotgun.sounds.shotgun_fire_01.wav`
 
 New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay lowercase. Add an `EmbeddedResource` with an explicit `LogicalName` when the game should load the file.
@@ -32,7 +34,7 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 
 | Type | Role |
 |---|---|
-| `Plugin` | Builds the shotgun and ammo-pile prefabs, loads the icon and shot sound, sets `item.totalUses` from config |
+| `Plugin` | Builds the shotgun and ammo-pile prefabs, loads their icons and the shot sound, sets `item.totalUses` from config |
 | `Action_Gun` | Primary fire. Shot request to the host, pellet cone, hit detection, shot sound, and the blast RPC |
 | `Action_Ammo` | Host-only `TrySpendOne` lowers `ItemUses` and broadcasts it with `ApplyUsesRPC` (also the fuel bar). `TryRefillToCapacity` sets remaining to `ShotCount` (never above). Clients accept `ApplyUsesRPC` only from the host, and write the count into the inventory slot whose instance-data guid matches the gun (never the currently selected slot). At zero the gun stops firing. The empty gun stays in hand |
 | `AmmoPileInteract` / `AmmoPilePatches` | Ground ammo pile: interact while holding an underfilled shotgun → host refill (pile stays). No pickup, no luggage loot |

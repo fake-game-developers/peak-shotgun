@@ -661,7 +661,7 @@ public partial class Plugin : BaseUnityPlugin
         item.showUseProgress = true;
         item.totalUses = ShotCount;
         item.UIData.itemName = "Shotgun";
-        ApplyIcon(item);
+        ApplyIcon(item, "Peak.Shotgun.icons.ShotgunIcon.png", "Shotgun");
         item.UIData.hideFuel = false;
         item.UIData.hasMainInteract = true;
         item.UIData.mainInteractPrompt = "SHOOT";
@@ -740,12 +740,12 @@ public partial class Plugin : BaseUnityPlugin
         LootData.AllSpawnWeightData = null;
     }
 
-    private static void ApplyIcon(Item item)
+    private static void ApplyIcon(Item item, string resourceName, string displayName)
     {
-        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Peak.Shotgun.icons.ShotgunIcon.png");
+        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
         if (stream == null)
         {
-            Log.LogWarning("Shotgun icon resource was not found.");
+            Log.LogWarning($"{displayName} icon resource was not found.");
             return;
         }
 
@@ -754,11 +754,11 @@ public partial class Plugin : BaseUnityPlugin
         var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
         if (!texture.LoadImage(memory.ToArray()))
         {
-            Log.LogWarning("Shotgun icon could not be decoded.");
+            Log.LogWarning($"{displayName} icon could not be decoded.");
             return;
         }
 
-        texture.name = "Shotgun";
+        texture.name = displayName;
         texture.wrapMode = TextureWrapMode.Clamp;
         item.UIData.icon = texture;
     }
@@ -951,7 +951,7 @@ public partial class Plugin : BaseUnityPlugin
         item.UIData.hasSecondInteract = false;
         item.UIData.canPocket = false;
         item.UIData.hideFuel = true;
-        item.UIData.icon = null;
+        ApplyIcon(item, "Peak.Shotgun.icons.AmmoIcon.png", "Ammo Pile");
         ItemCooking? cooking = pileObject.GetComponent<ItemCooking>();
         if (cooking != null)
         {
