@@ -17,6 +17,7 @@ The gun is not a new model. `Plugin.CreateFromBlowgun` waits for PEAK's item cat
 | `src/PeakShotgun/icons/AmmoIcon.png` | Ammo pile in-game icon, embedded in the DLL |
 | `src/PeakShotgun/icons/Melon.png` | Unused earlier test icon. Not embedded |
 | `src/PeakShotgun/sounds/shotgun_fire_01.wav` | Shot fire sound. Embedded |
+| `src/PeakShotgun/sounds/shotgun_empty_01.wav` | Empty-magazine click. Embedded |
 | `src/PeakShotgun/thunderstore.toml` | Thunderstore listing. `icon.png` at the repo root is the store icon, not the in-game one |
 | `artifacts/bin/Peak.Shotgun/release/PeakShotgun.dll` | Release build |
 
@@ -25,6 +26,7 @@ Embedded resource names are set in `Peak.Shotgun.csproj` and must match the `Get
 - `Peak.Shotgun.icons.ShotgunIcon.png`
 - `Peak.Shotgun.icons.AmmoIcon.png`
 - `Peak.Shotgun.sounds.shotgun_fire_01.wav`
+- `Peak.Shotgun.sounds.shotgun_empty_01.wav`
 
 New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay lowercase. Add an `EmbeddedResource` with an explicit `LogicalName` when the game should load the file.
 
@@ -35,7 +37,7 @@ New art goes in `icons/`. New audio goes in `sounds/`. Resource folders stay low
 | Type | Role |
 |---|---|
 | `Plugin` | Builds the shotgun and ammo-pile prefabs, loads their icons and the shot sound, sets `item.totalUses` and `item.carryWeight` from config |
-| `Action_Gun` | Primary fire. Shot request to the host, pellet cone, hit detection, shot sound, and the blast RPC |
+| `Action_Gun` | Primary fire. Shot request to the host, pellet cone, hit detection, shot sound, empty-click, and the blast RPC |
 | `Action_Ammo` | Host-only `TrySpendOne` lowers `ItemUses` and broadcasts it with `ApplyUsesRPC` (also the fuel bar). `TryRefillToCapacity` sets remaining to `ShotCount` (never above). Clients accept `ApplyUsesRPC` only from the host, and write the count into the inventory slot whose instance-data guid matches the gun (never the currently selected slot). At zero the gun stops firing. The empty gun stays in hand |
 | `AmmoPileInteract` / `AmmoPilePatches` | Ground ammo pile: interact while holding an underfilled shotgun → host refill (pile stays). No pickup, no luggage loot |
 | `CampfireAmmoSpawner` | Host-only: when `[AmmoPile] SpawnAtCampfire` is on, places piles around each segment campfire on first `Campfire.OnEnable` |
@@ -61,7 +63,7 @@ Every hit RPC carries the shot id, and the receiver checks it with `Action_Gun.T
 
 `RPC_ShotgunBlastFX` runs on every client. It plays `shotSFX` at the muzzle, flashes `ShotgunVFX` and shakes the camera. The shot sound must stay in this RPC: played from `Fire` only the shooter hears it. It does not spawn the blowgun dart puff. `ShotgunVFX.Play` puts the flash and smoke at that client's own `ShotgunMuzzle` and points them along it. `ShotgunMuzzle` sits at the centre of the barrel-end mesh slice (`Plugin.UpdateMeshAnchors`) with its forward along the barrel. Pellets start there but fly along the shooter's camera forward.
 
-The shot sound is a runtime `SFX_Instance` built from `sounds/shotgun_fire_01.wav`. If that wav fails to load, the gun falls back to the blowgun's `shotSFX`. `ItemUseFeedback.sfxUsed` on the clone is cleared so the blowgun's use sound does not also play.
+The shot sound is a runtime `SFX_Instance` built from `sounds/shotgun_fire_01.wav`. If that wav fails to load, the gun falls back to the blowgun's `shotSFX`. An empty magazine plays `emptyClickSFX` from `sounds/shotgun_empty_01.wav` at the muzzle on the fire-rate cooldown, with no blast FX. The click is sent to everyone (`RPC_EmptyClick`), same as the shot sound. Vanilla `Item.CanUsePrimary` is false at 0 uses, so `ShotgunEmptyUsePatch` keeps the shotgun usable when empty. `ItemUseFeedback.sfxUsed` on the clone is cleared so the blowgun's use sound does not also play.
 
 Ammo count is the BepInEx key `Shots` in section `Shotgun` (`BepInEx/config/PeakShotgun.cfg`). Default 5. Values below 1 become 1. `item.totalUses` is that number, not `-1`.
 

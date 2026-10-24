@@ -25,6 +25,9 @@ public class Action_Gun : ItemAction
 
     public SFX_Instance? shotSFX;
 
+    /// <summary>Dry-fire click when the magazine is empty.</summary>
+    public SFX_Instance? emptyClickSFX;
+
     public System.Action? OnShoot;
 
     // An unanswered request is re-sent with the same id after this long (message lost, host changed).
@@ -90,8 +93,15 @@ public class Action_Gun : ItemAction
             return;
         }
 
-        if (Time.time <= lastShootTime + fireRate || !HasAmmo() || spawnTransform == null)
+        if (Time.time <= lastShootTime + fireRate || spawnTransform == null)
         {
+            return;
+        }
+
+        if (!HasAmmo())
+        {
+            lastShootTime = Time.time;
+            PlayEmptyClick();
             return;
         }
 
@@ -336,6 +346,30 @@ public class Action_Gun : ItemAction
                 hit.Apply();
             }
         }
+    }
+
+    private void PlayEmptyClick()
+    {
+        Vector3 origin = spawnTransform != null ? spawnTransform.position : transform.position;
+        if (PhotonNetwork.InRoom)
+        {
+            photonView.RPC(nameof(RPC_EmptyClick), RpcTarget.All, origin);
+            return;
+        }
+
+        PlayEmptyClickAt(origin);
+    }
+
+    /// <summary>Everyone plays the dry-fire click. Sent from the shooter like <see cref="RPC_ShotgunBlastFX"/>.</summary>
+    [PunRPC]
+    private void RPC_EmptyClick(Vector3 origin)
+    {
+        PlayEmptyClickAt(origin);
+    }
+
+    private void PlayEmptyClickAt(Vector3 origin)
+    {
+        (emptyClickSFX ?? shotSFX)?.Play(origin);
     }
 
     private bool HasAmmo()

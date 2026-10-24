@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.20
+
+- Empty shotgun clicks play a dry-fire sound that everyone in the lobby hears
+
 ## 1.0.19
 
 - Add `[Shootables]` / `[HitsToDefeat]` (default on / 1 hit) for Condors, Antlions, Frogs, Beehives, Ticks, Jellyfish, and Coconuts
