@@ -730,6 +730,7 @@ public partial class Plugin : BaseUnityPlugin
         gun.OnHeld = true;
         gun.spawnTransform = spawn;
         gun.shotSFX = PlaceholderShot() ?? shotSfx;
+        gun.emptyClickSFX = EmptyClickSfx() ?? gun.shotSFX;
         if (gunObject.TryGetComponent(out ItemUseFeedback feedback))
         {
             feedback.sfxUsed = null;
@@ -823,6 +824,23 @@ public partial class Plugin : BaseUnityPlugin
             return null;
         }
 
+        return BuildShotSfx(clip);
+    }
+
+    private static SFX_Instance? EmptyClickSfx()
+    {
+        AudioClip? clip = LoadWav("Peak.Shotgun.sounds.shotgun_empty_01.wav");
+        if (clip == null)
+        {
+            Log.LogWarning("Shotgun empty-click sound was not found. Using the fire sound.");
+            return null;
+        }
+
+        return BuildShotSfx(clip);
+    }
+
+    private static SFX_Instance BuildShotSfx(AudioClip clip)
+    {
         var shot = ScriptableObject.CreateInstance<SFX_Instance>();
         shot.clips = new[] { clip };
         shot.settings = new SFX_Settings

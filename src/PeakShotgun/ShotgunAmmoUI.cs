@@ -80,3 +80,27 @@ internal static class ShotgunPromptPatch
         }
     }
 }
+
+/// <summary>
+/// Vanilla <see cref="Item.CanUsePrimary"/> is false at 0 uses, so <see cref="Action_Gun.RunAction"/>
+/// never runs and the dry-fire click cannot play. Keep the shotgun usable when empty.
+/// </summary>
+[HarmonyPatch(typeof(Item), nameof(Item.CanUsePrimary))]
+internal static class ShotgunEmptyUsePatch
+{
+    [HarmonyPostfix]
+    private static void AllowEmptyClick(Item __instance, ref bool __result)
+    {
+        if (__result || __instance == null || __instance.GetComponent<Action_Gun>() == null)
+        {
+            return;
+        }
+
+        if (!__instance.overrideUsability.IsNone || __instance.UIData == null || !__instance.UIData.hasMainInteract)
+        {
+            return;
+        }
+
+        __result = true;
+    }
+}
