@@ -10,7 +10,7 @@
 
 Turns PEAK's leftover blowgun into a shotgun.
 
-A blast throws eight pellets in a short cone, about every 0.85 seconds. Scouts who are hit take a heavy Injury and get flipped. Zombies ignore Injury. The first hit flips them and adds Drowsy. The second hit knocks them out, and they stay down until PEAK kills them. See the [zombie page](https://peak.wiki.gg/wiki/Zombie).
+A blast throws eight pellets in a short cone, about every 0.85 seconds. Scouts who are hit take a heavy Injury and get flipped. Zombies ignore Injury. The first hit flips them and adds Drowsy. The second hit knocks them out, and they stay down until PEAK kills them. See the [zombie page](https://peak.wiki.gg/wiki/Zombie). You can also shoot condors, antlions, Gloom frogs (they drop cooked frog legs), beehives, ticks, jellyfish, and coconuts on palm trees.
 
 ## Requirements
 
@@ -41,6 +41,7 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[Shotgun]` | `Shots` | `5` | Shots per shotgun (host's value in multiplayer) |
 | `[Shotgun]` | `EnableRecoil` | `true` | Push the shooter back on each shot |
 | `[Shotgun]` | `Recoil` | `5` | Recoil strength in m/s (0–10) |
+| `[Shotgun]` | `CarryWeight` | `4` | Stamina-bar weight (1 = 2.5). Default 4 = 10. 0 matches an empty backpack |
 | `[AmmoPile]` | `SpawnAtCampfire` | `true` | Host only: place ammo piles at segment campfires |
 | `[AmmoPile]` | `PilesPerCampfire` | `1` | How many piles per campfire (1–8) when spawning is on |
 | `[Shootables]` | `Scouts` | `true` | Injure / ragdoll other scouts |
@@ -52,6 +53,13 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[Shootables]` | `Scorpions` | `true` | Kill scorpions |
 | `[Shootables]` | `Dynamite` | `true` | Explode dynamite on hit |
 | `[Shootables]` | `Scoutmaster` | `true` | Drive off Scoutmaster Myres after enough hits |
+| `[Shootables]` | `Condors` | `true` | Kill Caldera condors (drops anyone they are carrying) |
+| `[Shootables]` | `Antlions` | `true` | Disable Mesa antlion pits |
+| `[Shootables]` | `Frogs` | `true` | Kill Gloom frogs (drops cooked frog legs) |
+| `[Shootables]` | `Beehives` | `true` | Smash Tropics beehives (honeycomb drops) |
+| `[Shootables]` | `Ticks` | `true` | Knock ticks off scouts |
+| `[Shootables]` | `Jellyfish` | `true` | Smash Shore jellyfish |
+| `[Shootables]` | `Coconuts` | `true` | Knock whole coconuts off palm trees |
 | `[HitsToDefeat]` | `Zombies` | `2` | Shots to knock down a zombie |
 | `[HitsToDefeat]` | `Mandrake` | `1` | Shots to destroy a mandrake |
 | `[HitsToDefeat]` | `Beetles` | `1` | Shots to kill a beetle |
@@ -60,11 +68,18 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[HitsToDefeat]` | `Scorpions` | `1` | Shots to kill a scorpion |
 | `[HitsToDefeat]` | `Dynamite` | `1` | Shots to explode dynamite |
 | `[HitsToDefeat]` | `Scoutmaster` | `4` | Shots to drive off the Scoutmaster |
+| `[HitsToDefeat]` | `Condors` | `1` | Shots to kill a condor |
+| `[HitsToDefeat]` | `Antlions` | `1` | Shots to disable an antlion |
+| `[HitsToDefeat]` | `Frogs` | `1` | Shots to kill a frog (drops cooked frog legs) |
+| `[HitsToDefeat]` | `Beehives` | `1` | Shots to smash a beehive |
+| `[HitsToDefeat]` | `Ticks` | `1` | Shots to knock a tick off |
+| `[HitsToDefeat]` | `Jellyfish` | `1` | Shots to smash a jellyfish |
+| `[HitsToDefeat]` | `Coconuts` | `1` | Shots to knock a coconut off a tree |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
 
 Fellow scouts are not under `[HitsToDefeat]`: each hit still applies Injury and knockback when `[Shootables] Scouts` is on.
 
-In multiplayer, `Shots`, every `[Shootables]` toggle, and every `[HitsToDefeat]` value come from the host, so the whole lobby plays by the same rules. Recoil and the hold pose stay per player.
+In multiplayer, `Shots`, every `[Shootables]` toggle, and every `[HitsToDefeat]` value come from the host, so the whole lobby plays by the same rules. Recoil, carry weight, and the hold pose stay per player.
 
 The host keeps track of which suitcases gave a shotgun in each run, in `BepInEx/config/PeakShotgun.loot.json`, so the per-biome cap and the Roots picks survive loading a quicksave or the host leaving mid-run.
 

@@ -8,8 +8,9 @@ namespace Peak.Shotgun;
 
 /// <summary>
 /// Room rules authored by the host only: magazine size (<c>Shots</c>), the
-/// <c>[Shootables]</c> toggles, and <c>[HitsToDefeat]</c>. Published through Photon room custom
-/// properties so every client applies the same rules, whoever fires and whoever is hit.
+/// <c>[Shootables]</c> toggles, <c>[HitsToDefeat]</c>, and defeated condors / antlions.
+/// Published through Photon room custom properties so every client applies the same rules,
+/// whoever fires and whoever is hit.
 /// </summary>
 internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchmakingCallbacks
 {
@@ -18,6 +19,8 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
     internal const string RoomShootablesKey = "PeakShotgun_Shootables";
 
     internal const string RoomHitsToDefeatKey = "PeakShotgun_HitsToDefeat";
+
+    internal const string RoomWorldDownKey = "PeakShotgun_WorldDown";
 
     private static int? hostShots;
 
@@ -88,6 +91,7 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
             { RoomShotsKey, shots },
             { RoomShootablesKey, (int)shootables },
             { RoomHitsToDefeatKey, hits.ToPacked() },
+            { RoomWorldDownKey, ShotgunCombat.PackWorldDefeats() },
         });
         Plugin.ApplyShotCountConfig();
         Plugin.Log.LogInfo(
@@ -122,6 +126,11 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
             }
         }
 
+        if (props.TryGetValue(RoomWorldDownKey, out object? rawDowns) && rawDowns is int[] worldDowns)
+        {
+            ShotgunCombat.ApplyPackedWorldDefeats(worldDowns);
+        }
+
         if (!props.TryGetValue(RoomShotsKey, out object? rawShots) || rawShots is not int shots)
         {
             return false;
@@ -139,6 +148,20 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
         return true;
     }
 
+    /// <summary>Host publishes defeated condors / antlions so late joiners apply the same outcome.</summary>
+    internal static void PublishWorldDefeats()
+    {
+        if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
+        {
+            return;
+        }
+
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { RoomWorldDownKey, ShotgunCombat.PackWorldDefeats() },
+        });
+    }
+
     private static bool HitsEqual(HitsToDefeatSettings a, HitsToDefeatSettings b) =>
         a.Zombies == b.Zombies
         && a.Mandrake == b.Mandrake
@@ -147,7 +170,14 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
         && a.Spores == b.Spores
         && a.Scorpions == b.Scorpions
         && a.Dynamite == b.Dynamite
-        && a.Scoutmaster == b.Scoutmaster;
+        && a.Scoutmaster == b.Scoutmaster
+        && a.Condors == b.Condors
+        && a.Antlions == b.Antlions
+        && a.Frogs == b.Frogs
+        && a.Beehives == b.Beehives
+        && a.Ticks == b.Ticks
+        && a.Jellyfish == b.Jellyfish
+        && a.Coconuts == b.Coconuts;
 
     private static void ClearHostSettings()
     {
@@ -180,7 +210,8 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
         ShotgunLootLedger.OnRoomPropertiesUpdate(propertiesThatChanged);
         if (propertiesThatChanged.ContainsKey(RoomShotsKey)
             || propertiesThatChanged.ContainsKey(RoomShootablesKey)
-            || propertiesThatChanged.ContainsKey(RoomHitsToDefeatKey))
+            || propertiesThatChanged.ContainsKey(RoomHitsToDefeatKey)
+            || propertiesThatChanged.ContainsKey(RoomWorldDownKey))
         {
             TryApplyRoomSettings();
         }

@@ -45,6 +45,19 @@ public partial class Plugin : BaseUnityPlugin
     /// <summary>m/s the shooter is pushed back along the aim per shot, 0-10. 0 when disabled. Live.</summary>
     internal static float Recoil => (recoilEnabled?.Value ?? true) ? recoil?.Value ?? 5f : 0f;
 
+    private static ConfigEntry<int>? carryWeight;
+
+    internal const int DefaultCarryWeight = 4;
+
+    internal const int MaxCarryWeight = 20;
+
+    /// <summary>
+    /// PEAK item-weight units on the stamina bar (1 = 2.5). Empty backpack is 0; 1 is the lightest real item.
+    /// Per player, like recoil. Live.
+    /// </summary>
+    internal static int CarryWeight =>
+        Mathf.Clamp(carryWeight?.Value ?? DefaultCarryWeight, 0, MaxCarryWeight);
+
     private static ConfigEntry<bool>? debugMode;
 
     /// <summary>Host spawns test zombies, shotguns and luggage near the player on Airport / Shore.</summary>
@@ -340,6 +353,9 @@ public partial class Plugin : BaseUnityPlugin
         recoil = Config.Bind("Shotgun", "Recoil", 5f, new ConfigDescription(
             "Metres per second the shooter is pushed back, opposite the aim, on each shot. Used when EnableRecoil is true.",
             new AcceptableValueRange<float>(0f, 10f)));
+        carryWeight = Config.Bind("Shotgun", "CarryWeight", DefaultCarryWeight, new ConfigDescription(
+            "Stamina-bar weight of a carried shotgun, in PEAK item units. 1 = 2.5 (blowgun). Default 4 = 10 on the bar. 0 matches an empty backpack. Live: save the .cfg and the prefab updates.",
+            new AcceptableValueRange<int>(0, MaxCarryWeight)));
         canSpawnOnAnyBiome = Config.Bind(
             "Shotgun",
             "CanSpawnOnAnyBiome",
@@ -496,6 +512,34 @@ public partial class Plugin : BaseUnityPlugin
         }
 
         ShotgunAmmoUI.Refresh();
+        ApplyCarryWeightConfig();
+    }
+
+    /// <summary>
+    /// Writes <see cref="CarryWeight"/> onto the prefab and live guns. Slots read <c>prefab.CarryWeight</c>
+    /// for the stamina bar, so the registered prefab is the one that matters.
+    /// </summary>
+    internal static void ApplyCarryWeightConfig()
+    {
+        int weight = CarryWeight;
+        if (ShotgunPrefab != null)
+        {
+            Item? prefabItem = ShotgunPrefab.GetComponent<Item>();
+            if (prefabItem != null)
+            {
+                prefabItem.carryWeight = weight;
+            }
+        }
+
+        foreach (ShotgunInstanceSetup setup in ShotgunInstanceSetup.Active)
+        {
+            if (setup?.Item == null)
+            {
+                continue;
+            }
+
+            setup.Item.carryWeight = weight;
+        }
     }
 
     private Coroutine? shoreSpawnRoutine;
@@ -504,6 +548,12 @@ public partial class Plugin : BaseUnityPlugin
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // Drop last map's condor / antlion defeats before the host republishes room settings.
+        if (mode == LoadSceneMode.Single)
+        {
+            ShotgunCombat.ClearWorldHitCounts();
+        }
+
         // Always re-read the .cfg here: map restart must see edits made while PEAK stayed open.
         // The Update() poll can lose a race with luggage / debug spawns on the new scene.
         ReloadConfigFromDisk("map load");
@@ -660,6 +710,7 @@ public partial class Plugin : BaseUnityPlugin
         item.usingTimePrimary = 0f;
         item.showUseProgress = true;
         item.totalUses = ShotCount;
+        item.carryWeight = CarryWeight;
         item.UIData.itemName = "Shotgun";
         ApplyIcon(item, "Peak.Shotgun.icons.ShotgunIcon.png", "Shotgun");
         item.UIData.hideFuel = false;

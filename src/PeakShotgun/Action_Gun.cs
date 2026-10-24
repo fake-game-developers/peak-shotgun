@@ -475,11 +475,11 @@ public class Action_Gun : ItemAction
     }
 
     /// <summary>
-    /// Host-only: apply a hit on a non-character target (spider, beetle, scorpion, mandrake, dynamite, spores)
-    /// after checking the shot was accepted and the room still allows shooting that kind of target.
+    /// Host-only: apply a hit on a non-character target after checking the shot was accepted and the
+    /// room still allows shooting that kind of target.
     /// </summary>
     [PunRPC]
-    public void RPC_HostShootTarget(int viewId, int kind, int shotId, PhotonMessageInfo info)
+    public void RPC_HostShootTarget(int viewId, int kind, int shotId, int extra, PhotonMessageInfo info)
     {
         if (!PhotonNetwork.IsMasterClient || !TryConsumeShot(info.Sender, shotId, viewId))
         {
@@ -489,8 +489,20 @@ public class Action_Gun : ItemAction
         PhotonView? view = PhotonView.Find(viewId);
         if (view != null)
         {
-            ShotgunCombat.HostApply(view, (ShotTargetKind)kind);
+            ShotgunCombat.HostApply(view, (ShotTargetKind)kind, this, extra);
         }
+    }
+
+    /// <summary>Host → everyone else: condor / antlion / jellyfish defeat. Late joiners get the same list as a room property.</summary>
+    [PunRPC]
+    public void RPC_ApplyWorldDefeat(int viewId, int kind, int extra, PhotonMessageInfo info)
+    {
+        if (info.Sender == null || !info.Sender.IsMasterClient)
+        {
+            return;
+        }
+
+        ShotgunCombat.ClientApplyDefeat(PhotonView.Find(viewId), (ShotTargetKind)kind, extra);
     }
 
     [PunRPC]

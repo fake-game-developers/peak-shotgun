@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.19
+
+- Add `[Shootables]` / `[HitsToDefeat]` (default on / 1 hit) for Condors, Antlions, Frogs, Beehives, Ticks, Jellyfish, and Coconuts
+- Condors drop anyone they are carrying and are removed
+- Antlion pits stop attacking and hide; the sand funnel stays
+- Frogs let go and drop cooked frog legs
+- Beehives smash open (honeycomb drops; bees get angry)
+- Ticks can be shot off a scout
+- Shore jellyfish smash
+- Whole coconuts fall off palm trees when shot (they do not split)
+- Shotgun carry weight: `[Shotgun] CarryWeight` default 4 (10 on the stamina bar). 0 matches an empty backpack
+- New keys default on in an existing `PeakShotgun.cfg`; that mix unlocks all-biome luggage unless you turn them off (Scoutmaster still does not count)
+
 ## 1.0.18
 
 - Campfire ammo piles now has a proper in-game icon
