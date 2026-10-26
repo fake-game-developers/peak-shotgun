@@ -42,7 +42,7 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
     public void RPC_ShotgunBlast(Vector3 direction, Vector3 point, int gunViewId, int shotId, PhotonMessageInfo info)
     {
         Character? character = GetComponent<Character>();
-        if (character == null || !character.photonView.IsMine || !IsZombie(character) || !ShotgunCombat.CanShootZombies)
+        if (character == null || !character.photonView.IsMine || !IsZombie(character) || !ShootableRules.Zombies.Enabled)
         {
             return;
         }
@@ -81,7 +81,7 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
         }
 
         shotgunHits++;
-        if (shotgunHits >= ShotgunCombat.HitsToDefeatZombies)
+        if (shotgunHits >= ShootableRules.Zombies.HitsToDefeat)
         {
             KnockDown(character);
             return;

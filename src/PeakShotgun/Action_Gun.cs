@@ -443,7 +443,7 @@ public class Action_Gun : ItemAction
             pelletRadius,
             direction,
             distance,
-            HelperFunctions.CharacterAndDefaultMask,
+            HelperFunctions.CharacterAndDefaultMask | ShotTargetRegistry.ExtraLayerMask,
             QueryTriggerInteraction.Collide);
 
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
@@ -496,7 +496,7 @@ public class Action_Gun : ItemAction
 
     private void ApplyGunImpact(Character local, Vector3 direction, Vector3 endpoint)
     {
-        if (!ShotgunCombat.CanShootScouts)
+        if (!ShootableRules.Scouts.Enabled)
         {
             return;
         }
@@ -537,6 +537,18 @@ public class Action_Gun : ItemAction
         }
 
         ShotgunCombat.ClientApplyDefeat(PhotonView.Find(viewId), (ShotTargetKind)kind, extra);
+    }
+
+    /// <summary>Host → everyone: short-lived feedback for a hit target (a push, a voice line).</summary>
+    [PunRPC]
+    public void RPC_ShotEffect(int viewId, int kind, int extra, Vector3 push, int variant, PhotonMessageInfo info)
+    {
+        if (info.Sender == null || !info.Sender.IsMasterClient)
+        {
+            return;
+        }
+
+        ShotgunCombat.ApplyEffect(PhotonView.Find(viewId), (ShotTargetKind)kind, extra, push, variant);
     }
 
     [PunRPC]

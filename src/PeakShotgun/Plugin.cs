@@ -73,7 +73,7 @@ public partial class Plugin : BaseUnityPlugin
     /// rolls in every biome. Roots always gets <see cref="GuaranteedLuggageShotguns"/> forced suitcases.
     /// </summary>
     internal static bool CanSpawnOnAnyBiome =>
-        (canSpawnOnAnyBiome?.Value ?? false) || !ShotgunCombat.IsZombiesOnlyShootables;
+        (canSpawnOnAnyBiome?.Value ?? false) || !ShootableRules.IsZombiesOnly;
 
     /// <summary>Host gives each scout one shotgun in hand once per run (late joiners included).</summary>
     internal static bool GiveShotgunOnSpawn => giveShotgunOnSpawn?.Value ?? false;
@@ -378,7 +378,7 @@ public partial class Plugin : BaseUnityPlugin
             new ConfigDescription(
                 "How many ammo piles to place at each campfire when SpawnAtCampfire is true.",
                 new AcceptableValueRange<int>(1, 8)));
-        ShotgunCombat.Bind(Config);
+        ShootableRules.Bind(Config);
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
@@ -413,6 +413,7 @@ public partial class Plugin : BaseUnityPlugin
         LuggageLiftExtra = Config.Bind("Model", "LuggageFloorPad", 0.025f, "Extra padding above the luggage floor after snapping the mesh bottom onto the suitcase lining.").Value;
         GameCompat.PatchAll(new Harmony(Name ?? "PeakShotgun"));
         RunStartupCheck("game name check", GameCompat.CheckNamedMembers);
+        RunStartupCheck("shot targets", ShotTargetRegistry.Initialize);
         gameObject.AddComponent<ShotgunCameraNearClip>();
         gameObject.AddComponent<HostConfigSync>();
         StartCoroutine(WaitForBlowgun());
