@@ -25,6 +25,11 @@ internal enum ShotTargetKind
     Tick = 13,
     Jellyfish = 14,
     Coconut = 15,
+    Tumbleweed = 16,
+    BeeSwarm = 17,
+    BingBong = 18,
+    Balloon = 19,
+    TiedBalloon = 20,
 }
 
 /// <summary>What the host knows about a hit when it defeats a target.</summary>

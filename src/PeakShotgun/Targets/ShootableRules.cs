@@ -29,6 +29,10 @@ internal enum ShootTargets
     Ticks = 1 << 13,
     Jellyfish = 1 << 14,
     Coconuts = 1 << 15,
+    Tumbleweeds = 1 << 16,
+    BeeSwarms = 1 << 17,
+    BingBong = 1 << 18,
+    Balloons = 1 << 19,
 }
 
 /// <summary>
@@ -175,6 +179,44 @@ internal static class ShootableRules
     internal static readonly ShootableRule Coconuts = new(
         "Coconuts", ShootTargets.Coconuts, 14, 1, "knock whole coconuts off palm trees", "knock a coconut off a tree");
 
+    // The rules below do not unlock all-biome luggage, so an existing Zombies-only config keeps Roots-only loot
+    // when these keys appear with their default (on).
+    internal static readonly ShootableRule Tumbleweeds = new(
+        "Tumbleweeds",
+        ShootTargets.Tumbleweeds,
+        -1,
+        1,
+        "blow Mesa tumbleweeds away (every hit pushes)",
+        "",
+        unlocksAllBiomeLoot: false);
+
+    internal static readonly ShootableRule BeeSwarms = new(
+        "BeeSwarms",
+        ShootTargets.BeeSwarms,
+        15,
+        1,
+        "scatter bee swarms, angry or not (they disperse like bees that lost their hive)",
+        "scatter a bee swarm",
+        unlocksAllBiomeLoot: false);
+
+    internal static readonly ShootableRule BingBong = new(
+        "BingBong",
+        ShootTargets.BingBong,
+        -1,
+        1,
+        "make Bing Bong squeak, say something, and fly (every hit reacts)",
+        "",
+        unlocksAllBiomeLoot: false);
+
+    internal static readonly ShootableRule Balloons = new(
+        "Balloons",
+        ShootTargets.Balloons,
+        -1,
+        1,
+        "pop balloons: ones tied to a scout (they lose that lift) and balloon items on the ground or in a hand",
+        "",
+        unlocksAllBiomeLoot: false);
+
     internal static readonly IReadOnlyList<ShootableRule> All =
     [
         Scouts,
@@ -193,6 +235,10 @@ internal static class ShootableRules
         Ticks,
         Jellyfish,
         Coconuts,
+        Tumbleweeds,
+        BeeSwarms,
+        BingBong,
+        Balloons,
     ];
 
     /// <summary>Bytes in the packed <c>[HitsToDefeat]</c> room property (highest slot + 1).</summary>

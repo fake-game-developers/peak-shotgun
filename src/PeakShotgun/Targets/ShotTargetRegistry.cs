@@ -49,6 +49,11 @@ internal static class ShotTargetRegistry
         Add(() => new BeehiveTarget());
         Add(() => new JellyfishTarget());
         Add(() => new CoconutTarget());
+        Add(() => new TumbleweedTarget());
+        Add(() => new BeeSwarmTarget());
+        Add(() => new BingBongTarget());
+        Add(() => new TiedBalloonTarget());
+        Add(() => new BalloonItemTarget());
         Add(() => new MandrakeTarget());
         Add(() => new DynamiteTarget());
         Add(() => new SporeBombTarget());
