@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.21
+
+- New shootables, all on by default: blow Mesa tumbleweeds away, scatter bee swarms, pop balloons (tied to a scout, on the ground, or in a hand), and get a reaction out of Bing Bong
+- New config keys `[Shootables] Tumbleweeds`, `BeeSwarms`, `BingBong`, `Balloons` and `[HitsToDefeat] BeeSwarms`; these do not unlock all-biome luggage, so a Zombies-only setup keeps Roots-only loot
+- Shot bee swarms stop stinging at once and scatter within half a second instead of chasing you for several seconds
+- Shotgun and ammo pile names and the refill prompt are translated into all of PEAK's languages; fix or add translations with `BepInEx/config/PeakShotgun.localization.csv`
+- Sturdier after PEAK updates: a game change now turns off only the feature it breaks instead of stopping the mod from loading, and the log says which one
+- Report bugs on GitHub Issues (link in the readme)
+
 ## 1.0.20
 
 - Empty shotgun clicks play a dry-fire sound that everyone in the lobby hears

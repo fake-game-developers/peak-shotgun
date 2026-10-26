@@ -73,7 +73,7 @@ public partial class Plugin : BaseUnityPlugin
     /// rolls in every biome. Roots always gets <see cref="GuaranteedLuggageShotguns"/> forced suitcases.
     /// </summary>
     internal static bool CanSpawnOnAnyBiome =>
-        (canSpawnOnAnyBiome?.Value ?? false) || !ShotgunCombat.IsZombiesOnlyShootables;
+        (canSpawnOnAnyBiome?.Value ?? false) || !ShootableRules.IsZombiesOnly;
 
     /// <summary>Host gives each scout one shotgun in hand once per run (late joiners included).</summary>
     internal static bool GiveShotgunOnSpawn => giveShotgunOnSpawn?.Value ?? false;
@@ -378,7 +378,7 @@ public partial class Plugin : BaseUnityPlugin
             new ConfigDescription(
                 "How many ammo piles to place at each campfire when SpawnAtCampfire is true.",
                 new AcceptableValueRange<int>(1, 8)));
-        ShotgunCombat.Bind(Config);
+        ShootableRules.Bind(Config);
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
@@ -411,7 +411,9 @@ public partial class Plugin : BaseUnityPlugin
         // Luggage-only flat diagonal: yaw around the suitcase floor normal on the visual (not the item root).
         LuggageYaw = Config.Bind("Model", "LuggageYaw", 45f, "Luggage-only yaw around the suitcase floor normal (degrees). Flip sign if diagonal goes the wrong way.").Value;
         LuggageLiftExtra = Config.Bind("Model", "LuggageFloorPad", 0.025f, "Extra padding above the luggage floor after snapping the mesh bottom onto the suitcase lining.").Value;
-        new Harmony(Name ?? "PeakShotgun").PatchAll();
+        GameCompat.PatchAll(new Harmony(Name ?? "PeakShotgun"));
+        RunStartupCheck("game name check", GameCompat.CheckNamedMembers);
+        RunStartupCheck("shot targets", ShotTargetRegistry.Initialize);
         gameObject.AddComponent<ShotgunCameraNearClip>();
         gameObject.AddComponent<HostConfigSync>();
         StartCoroutine(WaitForBlowgun());
@@ -423,6 +425,19 @@ public partial class Plugin : BaseUnityPlugin
         lastConfigWriteUtc = SafeConfigWriteTime();
         LogPose("Held pose at startup");
         Log.LogInfo($"Plugin {Name} is loaded.");
+    }
+
+    /// <summary>A startup step that only reports problems must never stop the plugin from loading.</summary>
+    private static void RunStartupCheck(string what, Action check)
+    {
+        try
+        {
+            check();
+        }
+        catch (Exception e)
+        {
+            Log.LogWarning($"Startup {what} failed ({e.GetType().Name}: {e.Message}).");
+        }
     }
 
     private DateTime SafeConfigWriteTime()
@@ -711,11 +726,11 @@ public partial class Plugin : BaseUnityPlugin
         item.showUseProgress = true;
         item.totalUses = ShotCount;
         item.carryWeight = CarryWeight;
-        item.UIData.itemName = "Shotgun";
+        item.UIData.itemName = ShotgunText.ShotgunItemName;
         ApplyIcon(item, "Peak.Shotgun.icons.ShotgunIcon.png", "Shotgun");
         item.UIData.hideFuel = false;
         item.UIData.hasMainInteract = true;
-        item.UIData.mainInteractPrompt = "SHOOT";
+        item.UIData.mainInteractPrompt = ShotgunText.ShootPrompt;
         if (spawn == null)
         {
             spawn = gunObject.transform;
@@ -761,6 +776,8 @@ public partial class Plugin : BaseUnityPlugin
         ApplyLuggageSpawnConfig(loot);
         LootData.AllSpawnWeightData = null;
 
+        // Before PEAKLib registers the item: it only adds an English row when the key is missing.
+        ShotgunText.Inject();
         new ItemContent(item).Register(ModDefinition.GetOrCreate(Info));
         ShotgunPrefab = gunObject;
         Log.LogInfo(
@@ -1014,9 +1031,9 @@ public partial class Plugin : BaseUnityPlugin
         item.usingTimePrimary = 0f;
         item.showUseProgress = false;
         item.totalUses = -1;
-        item.UIData.itemName = "Ammo Pile";
+        item.UIData.itemName = ShotgunText.AmmoPileItemName;
         item.UIData.hasMainInteract = true;
-        item.UIData.mainInteractPrompt = "REFILL";
+        item.UIData.mainInteractPrompt = ShotgunText.RefillPrompt;
         item.UIData.hasSecondInteract = false;
         item.UIData.canPocket = false;
         item.UIData.hideFuel = true;
@@ -1037,6 +1054,7 @@ public partial class Plugin : BaseUnityPlugin
 
         pileObject.AddComponent<AmmoPileInteract>();
 
+        ShotgunText.Inject();
         new ItemContent(item).Register(ModDefinition.GetOrCreate(Info));
         AmmoPilePrefab = pileObject;
         Log.LogInfo("Registered the ammo pile item.");

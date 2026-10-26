@@ -7,7 +7,7 @@ namespace Peak.Shotgun;
 
 public class GunCharacterLaunch : MonoBehaviourPunCallbacks
 {
-    private static readonly Type? ZombieType = AccessToolsType("MushroomZombie");
+    private static readonly Type? ZombieType = GameCompat.FindType(GameCompat.ZombieTypeName);
 
     // A coconut-style impulse is applied to every bone, which launches the body.
     // This is a short acceleration instead, so the ragdoll tips over in place.
@@ -42,7 +42,7 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
     public void RPC_ShotgunBlast(Vector3 direction, Vector3 point, int gunViewId, int shotId, PhotonMessageInfo info)
     {
         Character? character = GetComponent<Character>();
-        if (character == null || !character.photonView.IsMine || !IsZombie(character) || !ShotgunCombat.CanShootZombies)
+        if (character == null || !character.photonView.IsMine || !IsZombie(character) || !ShootableRules.Zombies.Enabled)
         {
             return;
         }
@@ -81,7 +81,7 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
         }
 
         shotgunHits++;
-        if (shotgunHits >= ShotgunCombat.HitsToDefeatZombies)
+        if (shotgunHits >= ShootableRules.Zombies.HitsToDefeat)
         {
             KnockDown(character);
             return;
@@ -205,19 +205,5 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
         {
             character.data.fallSeconds = 5f;
         }
-    }
-
-    private static Type? AccessToolsType(string name)
-    {
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            Type? type = assembly.GetType(name);
-            if (type != null)
-            {
-                return type;
-            }
-        }
-
-        return null;
     }
 }

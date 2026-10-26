@@ -43,10 +43,10 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
     }
 
     /// <summary>Host-synced shootable targets when in a room; otherwise the local config.</summary>
-    internal static ShootTargets Shootables => hostShootables ?? ShotgunCombat.LocalShootables;
+    internal static ShootTargets Shootables => hostShootables ?? ShootableRules.LocalShootables;
 
     /// <summary>Host-synced hits-to-defeat when in a room; otherwise the local config.</summary>
-    internal static HitsToDefeatSettings HitsToDefeat => hostHitsToDefeat ?? ShotgunCombat.LocalHitsToDefeat;
+    internal static HitsToDefeatSettings HitsToDefeat => hostHitsToDefeat ?? HitsToDefeatSettings.Local;
 
     private void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
 
@@ -81,8 +81,8 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
     private static void PublishHostSettings(string reason)
     {
         int shots = Plugin.LocalConfiguredShots;
-        ShootTargets shootables = ShotgunCombat.LocalShootables;
-        HitsToDefeatSettings hits = ShotgunCombat.LocalHitsToDefeat;
+        ShootTargets shootables = ShootableRules.LocalShootables;
+        HitsToDefeatSettings hits = HitsToDefeatSettings.Local;
         hostShots = shots;
         hostShootables = shootables;
         hostHitsToDefeat = hits;
@@ -95,7 +95,7 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
         });
         Plugin.ApplyShotCountConfig();
         Plugin.Log.LogInfo(
-            $"Host published Shots = {shots}, Shootables = {shootables}, HitsToDefeat zombies={hits.Zombies} ({reason}).");
+            $"Host published Shots = {shots}, Shootables = {shootables}, HitsToDefeat = {hits} ({reason}).");
     }
 
     /// <summary>Applies whichever room settings the host has published. False until <c>Shots</c> arrives.</summary>
@@ -119,10 +119,10 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
         if (props.TryGetValue(RoomHitsToDefeatKey, out object? rawHits) && rawHits is byte[] packed)
         {
             HitsToDefeatSettings hits = HitsToDefeatSettings.FromPacked(packed);
-            if (hostHitsToDefeat == null || !HitsEqual(hostHitsToDefeat.Value, hits))
+            if (hostHitsToDefeat == null || !hostHitsToDefeat.Value.Equals(hits))
             {
                 hostHitsToDefeat = hits;
-                Plugin.Log.LogInfo($"Client applied host HitsToDefeat zombies={hits.Zombies}.");
+                Plugin.Log.LogInfo($"Client applied host HitsToDefeat = {hits}.");
             }
         }
 
@@ -161,23 +161,6 @@ internal sealed class HostConfigSync : MonoBehaviour, IInRoomCallbacks, IMatchma
             { RoomWorldDownKey, ShotgunCombat.PackWorldDefeats() },
         });
     }
-
-    private static bool HitsEqual(HitsToDefeatSettings a, HitsToDefeatSettings b) =>
-        a.Zombies == b.Zombies
-        && a.Mandrake == b.Mandrake
-        && a.Beetles == b.Beetles
-        && a.Spiders == b.Spiders
-        && a.Spores == b.Spores
-        && a.Scorpions == b.Scorpions
-        && a.Dynamite == b.Dynamite
-        && a.Scoutmaster == b.Scoutmaster
-        && a.Condors == b.Condors
-        && a.Antlions == b.Antlions
-        && a.Frogs == b.Frogs
-        && a.Beehives == b.Beehives
-        && a.Ticks == b.Ticks
-        && a.Jellyfish == b.Jellyfish
-        && a.Coconuts == b.Coconuts;
 
     private static void ClearHostSettings()
     {

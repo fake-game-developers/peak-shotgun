@@ -10,7 +10,7 @@
 
 Turns PEAK's leftover blowgun into a shotgun.
 
-A blast throws eight pellets in a short cone, about every 0.85 seconds. Scouts who are hit take a heavy Injury and get flipped. Zombies ignore Injury. The first hit flips them and adds Drowsy. The second hit knocks them out, and they stay down until PEAK kills them. See the [zombie page](https://peak.wiki.gg/wiki/Zombie). You can also shoot condors, antlions, Gloom frogs (they drop cooked frog legs), beehives, ticks, jellyfish, and coconuts on palm trees.
+A blast throws eight pellets in a short cone, about every 0.85 seconds. Scouts who are hit take a heavy Injury and get flipped. Zombies ignore Injury. The first hit flips them and adds Drowsy. The second hit knocks them out, and they stay down until PEAK kills them. See the [zombie page](https://peak.wiki.gg/wiki/Zombie). You can also shoot condors, antlions, Gloom frogs (they drop cooked frog legs), beehives, ticks, jellyfish, and coconuts on palm trees, scatter bee swarms, blow Mesa tumbleweeds away, pop balloons (including the ones keeping a scout afloat), and get a reaction out of Bing Bong.
 
 ## Requirements
 
@@ -24,7 +24,7 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 
 - **On spawn (optional):** set `GiveShotgunOnSpawn = true` and the **host** puts one shotgun in each scout's hand when they enter the climb or join mid-run (Shore and later — not at the Airport; once per player per run).
 - **Roots:** every run, **at least two random luggage** anywhere on the Roots map are forced to contain a shotgun. No mod config turns it off, but a custom run that disables the shotgun in its item settings gets none.
-- **Other biomes:** by default every `[Shootables]` target is on, so luggage outside Roots can roll a shotgun (**RidiculouslyRare**). Luggage stays Roots-only only when **Zombies is the sole enabled** shootable (or set `CanSpawnOnAnyBiome = true` to force every biome). Roots still forces two suitcases either way.
+- **Other biomes:** by default every `[Shootables]` target is on, so luggage outside Roots can roll a shotgun (**RidiculouslyRare**). Luggage stays Roots-only only when **Zombies is the sole enabled** shootable, not counting Scoutmaster, tumbleweeds, bee swarms, Bing Bong and balloons (or set `CanSpawnOnAnyBiome = true` to force every biome). Roots still forces two suitcases either way.
 - **Cap:** at most **4** luggage per biome can contain a shotgun in a single run (including Roots).
 - **Campfire ammo:** by default the **host** places ammo piles at each segment campfire (`[AmmoPile] SpawnAtCampfire`). Hold a shotgun with fewer than `Shots` left, interact (**REFILL**), and the magazine fills up to `Shots` (never above). The pile stays. Ammo piles never appear in luggage. Set `SpawnAtCampfire = false` to disable.
 
@@ -60,6 +60,10 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[Shootables]` | `Ticks` | `true` | Knock ticks off scouts |
 | `[Shootables]` | `Jellyfish` | `true` | Smash Shore jellyfish |
 | `[Shootables]` | `Coconuts` | `true` | Knock whole coconuts off palm trees |
+| `[Shootables]` | `Tumbleweeds` | `true` | Blow Mesa tumbleweeds away (every hit pushes) |
+| `[Shootables]` | `BeeSwarms` | `true` | Scatter bee swarms, angry or not |
+| `[Shootables]` | `BingBong` | `true` | Bing Bong squeaks, says something, and flies (every hit) |
+| `[Shootables]` | `Balloons` | `true` | Pop balloons tied to scouts (they lose that lift) and balloon items on the ground or in a hand |
 | `[HitsToDefeat]` | `Zombies` | `2` | Shots to knock down a zombie |
 | `[HitsToDefeat]` | `Mandrake` | `1` | Shots to destroy a mandrake |
 | `[HitsToDefeat]` | `Beetles` | `1` | Shots to kill a beetle |
@@ -75,6 +79,7 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[HitsToDefeat]` | `Ticks` | `1` | Shots to knock a tick off |
 | `[HitsToDefeat]` | `Jellyfish` | `1` | Shots to smash a jellyfish |
 | `[HitsToDefeat]` | `Coconuts` | `1` | Shots to knock a coconut off a tree |
+| `[HitsToDefeat]` | `BeeSwarms` | `1` | Shots to scatter a bee swarm |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
 
 Fellow scouts are not under `[HitsToDefeat]`: each hit still applies Injury and knockback when `[Shootables] Scouts` is on.
@@ -82,6 +87,18 @@ Fellow scouts are not under `[HitsToDefeat]`: each hit still applies Injury and 
 In multiplayer, `Shots`, every `[Shootables]` toggle, and every `[HitsToDefeat]` value come from the host, so the whole lobby plays by the same rules. Recoil, carry weight, and the hold pose stay per player.
 
 The host keeps track of which suitcases gave a shotgun in each run, in `BepInEx/config/PeakShotgun.loot.json`, so the per-biome cap and the Roots picks survive loading a quicksave or the host leaving mid-run.
+
+## Translations
+
+The shotgun and ammo pile names and the refill prompt follow PEAK's language setting (all 15 languages). To fix or change a translation, create `BepInEx/config/PeakShotgun.localization.csv` with a `Key` column and one column per language, for example:
+
+```csv
+Key,English,German
+NAME_SHOTGUN,SHOTGUN,SCHROTFLINTE
+PEAKSHOTGUN_REFILL,refill,nachfüllen
+```
+
+Keys are `NAME_SHOTGUN`, `NAME_AMMO PILE` and `PEAKSHOTGUN_REFILL`. Language columns are `English`, `French`, `Italian`, `German`, `SpanishSpain`, `SpanishLatam`, `BRPortuguese`, `Russian`, `Ukrainian`, `SimplifiedChinese`, `TraditionalChinese`, `Japanese`, `Korean`, `Polish` and `Turkish`. Empty cells keep the built-in text.
 
 ## Install
 
