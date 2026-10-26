@@ -411,7 +411,8 @@ public partial class Plugin : BaseUnityPlugin
         // Luggage-only flat diagonal: yaw around the suitcase floor normal on the visual (not the item root).
         LuggageYaw = Config.Bind("Model", "LuggageYaw", 45f, "Luggage-only yaw around the suitcase floor normal (degrees). Flip sign if diagonal goes the wrong way.").Value;
         LuggageLiftExtra = Config.Bind("Model", "LuggageFloorPad", 0.025f, "Extra padding above the luggage floor after snapping the mesh bottom onto the suitcase lining.").Value;
-        new Harmony(Name ?? "PeakShotgun").PatchAll();
+        GameCompat.PatchAll(new Harmony(Name ?? "PeakShotgun"));
+        RunStartupCheck("game name check", GameCompat.CheckNamedMembers);
         gameObject.AddComponent<ShotgunCameraNearClip>();
         gameObject.AddComponent<HostConfigSync>();
         StartCoroutine(WaitForBlowgun());
@@ -423,6 +424,19 @@ public partial class Plugin : BaseUnityPlugin
         lastConfigWriteUtc = SafeConfigWriteTime();
         LogPose("Held pose at startup");
         Log.LogInfo($"Plugin {Name} is loaded.");
+    }
+
+    /// <summary>A startup step that only reports problems must never stop the plugin from loading.</summary>
+    private static void RunStartupCheck(string what, Action check)
+    {
+        try
+        {
+            check();
+        }
+        catch (Exception e)
+        {
+            Log.LogWarning($"Startup {what} failed ({e.GetType().Name}: {e.Message}).");
+        }
     }
 
     private DateTime SafeConfigWriteTime()
