@@ -43,6 +43,9 @@
 		<EmbeddedResource Include="models\ammo_pile_albedo_1k.png">
 			<LogicalName>Peak.Shotgun.models.ammo_pile_albedo.png</LogicalName>
 		</EmbeddedResource>
+		<EmbeddedResource Include="localization\strings.csv">
+			<LogicalName>Peak.Shotgun.localization.strings.csv</LogicalName>
+		</EmbeddedResource>
 	</ItemGroup>
 
 </Project>

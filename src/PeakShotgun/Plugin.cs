@@ -726,11 +726,11 @@ public partial class Plugin : BaseUnityPlugin
         item.showUseProgress = true;
         item.totalUses = ShotCount;
         item.carryWeight = CarryWeight;
-        item.UIData.itemName = "Shotgun";
+        item.UIData.itemName = ShotgunText.ShotgunItemName;
         ApplyIcon(item, "Peak.Shotgun.icons.ShotgunIcon.png", "Shotgun");
         item.UIData.hideFuel = false;
         item.UIData.hasMainInteract = true;
-        item.UIData.mainInteractPrompt = "SHOOT";
+        item.UIData.mainInteractPrompt = ShotgunText.ShootPrompt;
         if (spawn == null)
         {
             spawn = gunObject.transform;
@@ -776,6 +776,8 @@ public partial class Plugin : BaseUnityPlugin
         ApplyLuggageSpawnConfig(loot);
         LootData.AllSpawnWeightData = null;
 
+        // Before PEAKLib registers the item: it only adds an English row when the key is missing.
+        ShotgunText.Inject();
         new ItemContent(item).Register(ModDefinition.GetOrCreate(Info));
         ShotgunPrefab = gunObject;
         Log.LogInfo(
@@ -1029,9 +1031,9 @@ public partial class Plugin : BaseUnityPlugin
         item.usingTimePrimary = 0f;
         item.showUseProgress = false;
         item.totalUses = -1;
-        item.UIData.itemName = "Ammo Pile";
+        item.UIData.itemName = ShotgunText.AmmoPileItemName;
         item.UIData.hasMainInteract = true;
-        item.UIData.mainInteractPrompt = "REFILL";
+        item.UIData.mainInteractPrompt = ShotgunText.RefillPrompt;
         item.UIData.hasSecondInteract = false;
         item.UIData.canPocket = false;
         item.UIData.hideFuel = true;
@@ -1052,6 +1054,7 @@ public partial class Plugin : BaseUnityPlugin
 
         pileObject.AddComponent<AmmoPileInteract>();
 
+        ShotgunText.Inject();
         new ItemContent(item).Register(ModDefinition.GetOrCreate(Info));
         AmmoPilePrefab = pileObject;
         Log.LogInfo("Registered the ammo pile item.");

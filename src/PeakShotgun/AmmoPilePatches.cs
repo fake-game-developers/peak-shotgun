@@ -37,7 +37,7 @@ internal static class AmmoPileInteractionTextPatch
             return true;
         }
 
-        __result = "REFILL";
+        __result = ShotgunText.Refill;
         return false;
     }
 }
