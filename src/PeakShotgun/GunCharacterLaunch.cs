@@ -55,15 +55,20 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
         }
 
         int targetId = character.photonView.ViewID;
-        if (!gun.TryConsumeOrDeferHit(info.Sender, shotId, targetId, () => Blast(direction, point)))
+        Photon.Realtime.Player shooter = info.Sender;
+        if (!gun.TryConsumeOrDeferHit(shooter, shotId, targetId, () => Blast(direction, point, gun, shooter)))
         {
             return;
         }
 
-        Blast(direction, point);
+        Blast(direction, point, gun, shooter);
     }
 
-    public void Blast(Vector3 direction, Vector3 point)
+    /// <summary>
+    /// Owner only. <paramref name="gun"/> and <paramref name="shooter"/> (null = the local player) are told when
+    /// this hit knocks a zombie down, for the shooter's red hit marker.
+    /// </summary>
+    public void Blast(Vector3 direction, Vector3 point, Action_Gun? gun = null, Photon.Realtime.Player? shooter = null)
     {
         Character? character = GetComponent<Character>();
         if (character == null || !character.photonView.IsMine || character.data.dead)
@@ -83,6 +88,12 @@ public class GunCharacterLaunch : MonoBehaviourPunCallbacks
         shotgunHits++;
         if (shotgunHits >= ShootableRules.Zombies.HitsToDefeat)
         {
+            // Shooting a zombie that is already down keeps it down but is not another knockdown.
+            if (!heldDown)
+            {
+                ShotgunHitMarker.ConfirmDefeat(gun, shooter, character.photonView.ViewID);
+            }
+
             KnockDown(character);
             return;
         }

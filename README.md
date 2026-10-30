@@ -80,11 +80,14 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[HitsToDefeat]` | `Jellyfish` | `1` | Shots to smash a jellyfish |
 | `[HitsToDefeat]` | `Coconuts` | `1` | Shots to knock a coconut off a tree |
 | `[HitsToDefeat]` | `BeeSwarms` | `1` | Shots to scatter a bee swarm |
+| `[Feedback]` | `HitMarkers` | `true` | Flash ticks on the crosshair when your shot hits something; larger red ticks when it downs it |
+| `[Feedback]` | `Tracers` | `true` | Short streaks along each pellet's path |
+| `[Feedback]` | `ImpactEffects` | `true` | Sparks and dust where pellets land |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |
 
 Fellow scouts are not under `[HitsToDefeat]`: each hit still applies Injury and knockback when `[Shootables] Scouts` is on.
 
-In multiplayer, `Shots`, every `[Shootables]` toggle, and every `[HitsToDefeat]` value come from the host, so the whole lobby plays by the same rules. Recoil, carry weight, and the hold pose stay per player.
+In multiplayer, `Shots`, every `[Shootables]` toggle, and every `[HitsToDefeat]` value come from the host, so the whole lobby plays by the same rules. Recoil, carry weight, the hold pose and everything under `[Feedback]` stay per player.
 
 The host keeps track of which suitcases gave a shotgun in each run, in `BepInEx/config/PeakShotgun.loot.json`, so the per-biome cap and the Roots picks survive loading a quicksave or the host leaving mid-run.
 
@@ -108,7 +111,7 @@ Keys are `NAME_SHOTGUN`, `NAME_AMMO PILE` and `PEAKSHOTGUN_REFILL`. Language col
 ## How to test
 
 1. Set `EnableDebugMode = true` under `[Debug]` in the PeakShotgun config file (it appears after one launch). Host a run. On the Shore, three zombies appear near you, and a Shotgun is on the ground in front of you. With debug mode off (the default) nothing is force-spawned there; open Roots luggage to find the two guaranteed shotguns.
-2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds, plays the shotgun fire sound and pushes you back a little. Each shotgun has 5 shots. Tune `Shots`, `EnableRecoil`, and `Recoil` under `[Shotgun]` as needed.
+2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds, plays the shotgun fire sound, draws pellet tracers with sparks where they land and pushes you back a little. A hit flashes ticks on the crosshair. Each shotgun has 5 shots. Tune `Shots`, `EnableRecoil`, and `Recoil` under `[Shotgun]` as needed.
 3. Shoot another scout. They take a heavy Injury and get flipped. You cannot hit yourself.
 4. Reach the Roots (Peak ascent or higher for natural zombies). Open luggage until you find a shotgun, then shoot a zombie. The first blast flips it, and it can get back up. The second blast knocks it out, and it stays down. Or use debug Shore zombies from step 1.
 

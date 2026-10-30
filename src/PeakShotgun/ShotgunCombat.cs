@@ -137,7 +137,7 @@ internal static class ShotgunCombat
         int extra = ShotTargetRegistry.ExtraOf(target, component);
         if (!PhotonNetwork.InRoom || PhotonNetwork.IsMasterClient || view == null)
         {
-            ApplyRegisteredHit(target, component, view, gun, extra);
+            ApplyRegisteredHit(target, component, view, gun, extra, shooter: null);
             return;
         }
 
@@ -154,7 +154,7 @@ internal static class ShotgunCombat
     /// Host side of <see cref="Action_Gun.RPC_HostShootTarget"/>: find the claimed target under the view and apply
     /// it only if it really is that kind of target and the room allows shooting it.
     /// </summary>
-    internal static void HostApply(PhotonView view, ShotTargetKind kind, Action_Gun? gun = null, int extra = 0)
+    internal static void HostApply(PhotonView view, ShotTargetKind kind, Action_Gun? gun = null, int extra = 0, Photon.Realtime.Player? shooter = null)
     {
         ShotTarget? target = ShotTargetRegistry.For(kind);
         if (target == null || !target.Rule.Enabled)
@@ -168,12 +168,21 @@ internal static class ShotgunCombat
         // contains a mandrake or spore emitter.
         if (component != null && ShotTargetRegistry.ViewOf(target, component) == view)
         {
-            ApplyRegisteredHit(target, component, view, gun, extra);
+            ApplyRegisteredHit(target, component, view, gun, extra, shooter);
         }
     }
 
-    /// <summary>Runs on the host (or offline, or for a target with no network view).</summary>
-    private static void ApplyRegisteredHit(ShotTarget target, Component component, PhotonView? view, Action_Gun? gun, int extra)
+    /// <summary>
+    /// Runs on the host (or offline, or for a target with no network view). <paramref name="shooter"/> null means
+    /// the local player fired.
+    /// </summary>
+    private static void ApplyRegisteredHit(
+        ShotTarget target,
+        Component component,
+        PhotonView? view,
+        Action_Gun? gun,
+        int extra,
+        Photon.Realtime.Player? shooter)
     {
         if (!target.Rule.Enabled || !RegisterWorldHitTowardDefeat(target, component, view, extra))
         {
@@ -183,6 +192,12 @@ internal static class ShotgunCombat
         if (ShotTargetRegistry.Defeat(target, component, new ShotHit(view, gun, extra)))
         {
             ReplicateWorldDefeat(target, gun, view, extra);
+
+            // Targets without a hit count (a tumbleweed push, a balloon pop) react to every hit; not a defeat.
+            if (target.Rule.HasHitCount)
+            {
+                ShotgunHitMarker.ConfirmDefeat(gun, shooter, view != null ? view.ViewID : 0);
+            }
         }
     }
 
@@ -309,7 +324,7 @@ internal static class ShotgunCombat
             GunCharacterLaunch? launch = character.GetComponent<GunCharacterLaunch>();
             if (character.photonView.IsMine)
             {
-                launch?.Blast(direction, hitPoint);
+                launch?.Blast(direction, hitPoint, gun);
             }
             else
             {

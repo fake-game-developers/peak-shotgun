@@ -418,23 +418,39 @@ public class Action_Gun : ItemAction
         }
 
         var struck = new HashSet<int>();
+        var pellets = new float[pelletCount * ShotgunVFX.PelletStride];
+        bool hitAny = false;
 
         for (int i = 0; i < pelletCount; i++)
         {
             Vector2 offset = PelletOffset(i, pelletCount, spread);
             Vector3 direction = (forward + right * offset.x + up * offset.y).normalized;
-            TryPellet(shotId, origin, direction, struck);
+            hitAny |= TryPellet(shotId, origin, direction, struck, out Vector3 end, out bool impact);
+            ShotgunVFX.PackPellet(pellets, i, end, impact);
         }
 
-        photonView.RPC(nameof(RPC_ShotgunBlastFX), RpcTarget.All, origin, forward);
+        if (hitAny)
+        {
+            ShotgunHitMarker.Show(defeat: false);
+        }
+
+        photonView.RPC(nameof(RPC_ShotgunBlastFX), RpcTarget.All, origin, forward, pellets);
     }
 
-    private void TryPellet(int shotId, Vector3 origin, Vector3 direction, HashSet<int> struck)
+    /// <summary>
+    /// One pellet: the first target it can hit before the terrain; true when it hit one. <paramref name="end"/> is
+    /// where it stopped (target, terrain, or max range) and <paramref name="impact"/> whether it hit something there.
+    /// </summary>
+    private bool TryPellet(int shotId, Vector3 origin, Vector3 direction, HashSet<int> struck, out Vector3 end, out bool impact)
     {
         float distance = maxDistance;
+        end = origin + direction * maxDistance;
+        impact = false;
         if (Physics.Raycast(origin, direction, out RaycastHit lineHit, maxDistance, HelperFunctions.terrainMapMask, QueryTriggerInteraction.Ignore))
         {
             distance = lineHit.distance;
+            end = lineHit.point;
+            impact = true;
         }
 
         // Character + Default covers scouts/zombies, mobs, spiders, and most world items (mandrake, dynamite, spores).
@@ -467,8 +483,13 @@ public class Action_Gun : ItemAction
             }
 
             struck.Add(id);
-            return;
+            // A sweep that starts inside a collider reports distance 0 and no point.
+            end = candidate.distance > 0f ? candidate.point : origin + direction * pelletRadius;
+            impact = true;
+            return true;
         }
+
+        return false;
     }
 
     [PunRPC]
@@ -523,8 +544,32 @@ public class Action_Gun : ItemAction
         PhotonView? view = PhotonView.Find(viewId);
         if (view != null)
         {
-            ShotgunCombat.HostApply(view, (ShotTargetKind)kind, this, extra);
+            ShotgunCombat.HostApply(view, (ShotTargetKind)kind, this, extra, info.Sender);
         }
+    }
+
+    /// <summary>
+    /// To the shooter: their shot downed a target, so show the red hit marker. The host confirms world targets; a
+    /// zombie's owner confirms its knockdown.
+    /// </summary>
+    [PunRPC]
+    public void RPC_ShotDefeat(int targetViewId, PhotonMessageInfo info)
+    {
+        if (info.Sender == null)
+        {
+            return;
+        }
+
+        if (!info.Sender.IsMasterClient)
+        {
+            PhotonView? target = PhotonView.Find(targetViewId);
+            if (target == null || target.Owner != info.Sender)
+            {
+                return;
+            }
+        }
+
+        ShotgunHitMarker.Show(defeat: true);
     }
 
     /// <summary>Host → everyone else: condor / antlion / jellyfish defeat. Late joiners get the same list as a room property.</summary>
@@ -551,11 +596,18 @@ public class Action_Gun : ItemAction
         ShotgunCombat.ApplyEffect(PhotonView.Find(viewId), (ShotTargetKind)kind, extra, push, variant);
     }
 
+    /// <summary>Everyone: blast sound, flash, shake, tracers and impacts (<paramref name="pellets"/>).</summary>
     [PunRPC]
-    private void RPC_ShotgunBlastFX(Vector3 origin, Vector3 forward)
+    private void RPC_ShotgunBlastFX(Vector3 origin, Vector3 forward, float[] pellets)
     {
         shotSFX?.Play(origin);
-        GetComponent<ShotgunVFX>()?.Play(origin, forward);
+        ShotgunVFX? vfx = GetComponent<ShotgunVFX>();
+        if (vfx != null)
+        {
+            vfx.Play(origin, forward);
+            Plugin.Guard("Pellet tracers and impacts", () => vfx.Pellets(origin, pellets));
+        }
+
         GamefeelHandler.instance.AddPerlinShakeProximity(origin + forward * 3f, 12f);
     }
 
