@@ -118,6 +118,17 @@ public partial class Plugin : BaseUnityPlugin
     internal static SpawnPool ShotgunLuggagePools =>
         CanSpawnOnAnyBiome ? AllLuggagePools : SpawnPool.LuggageRoots;
 
+    // [Feedback]: what this player sees. Per player, like recoil. Live.
+    private static ConfigEntry<bool>? hitMarkers;
+    private static ConfigEntry<bool>? tracers;
+    private static ConfigEntry<bool>? impactEffects;
+
+    internal static bool HitMarkers => hitMarkers?.Value ?? true;
+
+    internal static bool Tracers => tracers?.Value ?? true;
+
+    internal static bool ImpactEffects => impactEffects?.Value ?? true;
+
     // Held pose. These read the config entries live (not cached at startup), and Update() re-reads the
     // .cfg file when it changes, so the pose can be tuned while the game is running.
     private static ConfigEntry<float>? poseRight;
@@ -379,6 +390,9 @@ public partial class Plugin : BaseUnityPlugin
                 "How many ammo piles to place at each campfire when SpawnAtCampfire is true.",
                 new AcceptableValueRange<int>(1, 8)));
         ShootableRules.Bind(Config);
+        hitMarkers = Config.Bind("Feedback", "HitMarkers", true, "Flash a marker on the crosshair when your shot hits something, and a red one when it downs it.");
+        tracers = Config.Bind("Feedback", "Tracers", true, "Draw a short streak along each pellet's path.");
+        impactEffects = Config.Bind("Feedback", "ImpactEffects", true, "Show sparks and dust where pellets land.");
         debugMode = Config.Bind("Debug", "EnableDebugMode", false, "Host spawns test zombies, a shotgun and luggage near the player at the Airport and on the Shore. Off = spawn nothing.");
         ModelScale = Config.Bind("Model", "Scale", 0.5f, "Uniform scale of the custom shotgun mesh (mesh is unit-normalized). Keep ≤0.55 so standing over it does not hit the camera near-clip.").Value;
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
@@ -416,6 +430,7 @@ public partial class Plugin : BaseUnityPlugin
         RunStartupCheck("shot targets", ShotTargetRegistry.Initialize);
         gameObject.AddComponent<ShotgunCameraNearClip>();
         gameObject.AddComponent<HostConfigSync>();
+        gameObject.AddComponent<ShotgunHitMarker>();
         StartCoroutine(WaitForBlowgun());
         StartCoroutine(WaitForAmmoPile());
         StartCoroutine(StartingShotgunGiver.WhenPlayersAreReady());
@@ -425,6 +440,28 @@ public partial class Plugin : BaseUnityPlugin
         lastConfigWriteUtc = SafeConfigWriteTime();
         LogPose("Held pose at startup");
         Log.LogInfo($"Plugin {Name} is loaded.");
+    }
+
+    private static readonly System.Collections.Generic.HashSet<string> reportedGuardFailures = new();
+
+    /// <summary>
+    /// Runs optional mod code (hit markers, tracers, impacts) that is called from inside PEAK's own methods: a patch, an RPC, a
+    /// character spawn. An exception there must never escape into the game's call, or the game step it interrupts
+    /// (spawning a scout, loading a map) is left half done. Logs the first failure of each kind.
+    /// </summary>
+    internal static void Guard(string what, Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception e)
+        {
+            if (reportedGuardFailures.Add(what))
+            {
+                Log.LogError($"{what} failed and was skipped: {e}");
+            }
+        }
     }
 
     /// <summary>A startup step that only reports problems must never stop the plugin from loading.</summary>
