@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.22
+
+- Hit markers: ticks flash on your crosshair when your shot hits something; bigger red ticks when it downs the target (zombie knocked out, creature killed, Scoutmaster driven off). Only the shooter sees them
+- Pellet tracers: a short streak along each pellet's path, seen by everyone
+- Impact effects: sparks and a puff of dust where pellets land
+- New `[Feedback]` config section, per player and live: `HitMarkers`, `Tracers`, `ImpactEffects` (all on by default)
+- Everyone in a lobby needs this version: players on 1.0.21 miss other players' shot sounds and effects
+
 ## 1.0.21
 
 - New shootables, all on by default: blow Mesa tumbleweeds away, scatter bee swarms, pop balloons (tied to a scout, on the ground, or in a hand), and get a reaction out of Bing Bong
