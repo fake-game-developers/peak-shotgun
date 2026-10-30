@@ -4,6 +4,8 @@ Map of the shotgun mod for agents and developers. The player-facing setup is in 
 
 The disk folder is still `Peak_AKGun`. The solution is `Peak.Shotgun.slnx`. The C# namespace is `Peak.Shotgun`. The assembly, BepInEx plugin, and Thunderstore name are `PeakShotgun`.
 
+The shotgun is automatic: holding fire keeps shooting at the fire rate, and the action cycles itself. It is not a pump-action gun. Do not add a pump sound, pump animation, racking between shots, or the word "pump" in code, config or text. The wooden grip under the barrel, where the left hand sits, is the forend.
+
 The gun is not a new model. `Plugin.CreateFromBlowgun` waits for PEAK's item catalog, clones the blowgun, strips its `ItemAction`s, and registers that clone with PEAKLib. The world mesh stays the blowgun. Do not replace the blowgun item itself.
 
 ## Where things live
