@@ -77,7 +77,7 @@ internal static class ShotgunModelSwap
     /// <summary>
     /// PEAK attaches each hand to direct children named Hand_R / Hand_L (position AND rotation), and holds
     /// the item root at <c>Item.defaultPos</c>. Right hand on the rear grip (at the item origin), left hand
-    /// under the wooden pump. The blowgun rotations we clone are for a tube held at the mouth.
+    /// under the wooden forend. The blowgun rotations we clone are for a tube held at the mouth.
     /// </summary>
     internal static void PlaceHandAnchors(GameObject gunObject, Mesh mesh, bool log = true)
     {
@@ -105,7 +105,7 @@ internal static class ShotgunModelSwap
         Vector3 ToItem(Vector3 meshLocal) => heldPos + heldRot * (meshLocal * scale);
 
         // PEAK's CharacterItems.AttachItem snaps Hand_R / Hand_L bones to these children (no swapping).
-        // Right hand = rear grip / trigger. Left hand = wooden pump.
+        // Right hand = rear grip / trigger. Left hand = wooden forend.
         if (handR != null)
         {
             Vector3 gripCenter = ToItem(gripMesh);
@@ -119,12 +119,12 @@ internal static class ShotgunModelSwap
 
         if (handL != null)
         {
-            // Onto the pump axis and up into the wood (not floating out beside / below it).
-            Vector3 pumpCenter = ToItem(forendMesh)
+            // Onto the forend axis and up into the wood (not floating out beside / below it).
+            Vector3 forendCenter = ToItem(forendMesh)
                 + Plugin.HeldAim * new Vector3(-Plugin.LeftHandIn, Plugin.LeftHandUp, 0f);
-            Quaternion leftRot = Plugin.HeldAim * LeftPumpRotation;
+            Quaternion leftRot = Plugin.HeldAim * LeftForendRotation;
             handL.localRotation = leftRot;
-            handL.localPosition = pumpCenter - leftRot * (Vector3.up * GripReach);
+            handL.localPosition = forendCenter - leftRot * (Vector3.up * GripReach);
         }
 
         if (gunObject.TryGetComponent(out Item item))
@@ -135,7 +135,7 @@ internal static class ShotgunModelSwap
         if (log)
         {
             Plugin.Log.LogInfo(
-                $"Shotgun hand anchors: grip(Hand_R)={handR?.localPosition}, pump(Hand_L)={handL?.localPosition}, defaultPos={Plugin.HeldDefaultPos}.");
+                $"Shotgun hand anchors: grip(Hand_R)={handR?.localPosition}, forend(Hand_L)={handL?.localPosition}, defaultPos={Plugin.HeldDefaultPos}.");
         }
     }
 
@@ -148,8 +148,8 @@ internal static class ShotgunModelSwap
     // around a centred shaft: Torch R 0.134, Torch L 0.160, RopeShooter R 0.141; ~0 along the palm normal.
     private const float GripReach = 0.14f;
 
-    // Left: thumb along the barrel, palm under the pump, fingers wrapping up around the wood.
-    private static readonly Quaternion LeftPumpRotation = Quaternion.LookRotation(Vector3.forward, new Vector3(0.6f, 1f, 0f));
+    // Left: thumb along the barrel, palm under the forend, fingers wrapping up around the wood.
+    private static readonly Quaternion LeftForendRotation = Quaternion.LookRotation(Vector3.forward, new Vector3(0.6f, 1f, 0f));
 
     private static Material? FindPeakMaterial(GameObject gunObject)
     {

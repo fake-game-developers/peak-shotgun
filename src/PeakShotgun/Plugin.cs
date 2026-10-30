@@ -126,10 +126,10 @@ public partial class Plugin : BaseUnityPlugin
     private static ConfigEntry<float>? poseLeftHandIn;
     private static ConfigEntry<float>? poseLeftHandUp;
 
-    /// <summary>Metres the left hand is pulled onto the pump from the outside (item +X / toward the gun axis).</summary>
+    /// <summary>Metres the left hand is pulled onto the forend from the outside (item +X / toward the gun axis).</summary>
     internal static float LeftHandIn => poseLeftHandIn?.Value ?? 0.01f;
 
-    /// <summary>Metres the left hand is lifted into the pump underside (item +Y).</summary>
+    /// <summary>Metres the left hand is lifted into the forend underside (item +Y).</summary>
     internal static float LeftHandUp => poseLeftHandUp?.Value ?? 0.04f;
 
     private static ConfigEntry<float>? poseRightWristDown;
@@ -181,7 +181,7 @@ public partial class Plugin : BaseUnityPlugin
     /// <summary>Mesh-space rear grip / trigger point. Held pose puts this at the item origin so Hand_R stays in reach.</summary>
     internal static Vector3 GripMeshPoint { get; private set; }
 
-    /// <summary>Mesh-space wooden pump point for the left hand.</summary>
+    /// <summary>Mesh-space wooden forend point for the left hand.</summary>
     internal static Vector3 ForendMeshPoint { get; private set; }
 
     /// <summary>
@@ -218,13 +218,13 @@ public partial class Plugin : BaseUnityPlugin
         // The mesh is not axis-aligned (the stock drops and drifts sideways), so whole-mesh bounds put the
         // hands beside and below the gun. Centre each hand on the cross-section of the part it holds instead.
         // Slices are fractions from muzzle (0) to butt (1): rear grip behind the trigger guard,
-        // pump = the wooden forend under the barrel (not the muzzle tip).
+        // The wooden forend under the barrel (not the muzzle tip).
         Vector3[] vertices = mesh.vertices;
         Bounds wrist = SliceBounds(vertices, b, 0.64f, 0.72f);
-        Bounds pump = SliceBounds(vertices, b, 0.22f, 0.34f);
+        Bounds forend = SliceBounds(vertices, b, 0.22f, 0.34f);
         GripMeshPoint = wrist.center;
-        // Underside of the pump wood (not out beside it).
-        ForendMeshPoint = new Vector3(pump.center.x, pump.center.y, Mathf.Lerp(pump.min.z, pump.center.z, 0.35f));
+        // Underside of the forend wood (not out beside it).
+        ForendMeshPoint = new Vector3(forend.center.x, forend.center.y, Mathf.Lerp(forend.min.z, forend.center.z, 0.35f));
         // Barrel end: centre of the tip slice. Whole-mesh bounds put it 15 cm low and 7 cm to the side.
         Bounds tip = SliceBounds(vertices, b, 0f, 0.02f);
         MuzzleMeshPoint = new Vector3(b.min.x, tip.center.y, tip.center.z);
@@ -384,14 +384,14 @@ public partial class Plugin : BaseUnityPlugin
         // New section on purpose: BepInEx keeps values already saved in the .cfg, so reusing an old key
         // would ignore a changed default. Older [Model] PosX/PosY/PosZ, [Hold], [Pose] and [HeldPose] entries are unused.
         // These are live: edit and save the .cfg while the game runs and the pose updates within a second.
-        // Less far right than 0.75 — that forced the left arm through the chest to reach the pump.
+        // Less far right than 0.75 — that forced the left arm through the chest to reach the forend.
         poseRight = Config.Bind("HoldPose", "Side", 0.55f, "Item.defaultPos.x: how far right of the head the gun and both hands are held. 0 = centred.");
         // Section bump: GunHeight 0 parked the grip at head height and sky'd the right elbow with tip-down.
         poseUp = Config.Bind("HoldPose", "GunHeight", -0.65f, "Item.defaultPos.y: height relative to the head bone. The blowgun uses 0.33 (mouth). Bigger = higher on screen; more negative = lower on the torso.");
         poseForward = Config.Bind("HoldPose", "HoldForward", 1.6f, "Item.defaultPos.z: metres in front of the head. Bigger = gun further forward, arms less cramped.");
-        // Pull the left hand onto the pump (in) and up into the wood.
-        poseLeftHandIn = Config.Bind("HoldPose", "LeftHandIn", 0.01f, "Metres the left hand is pulled onto the pump from the outside (toward the barrel axis).");
-        poseLeftHandUp = Config.Bind("HoldPose", "LeftHandUp", 0.04f, "Metres the left hand is lifted into the pump underside.");
+        // Pull the left hand onto the forend (in) and up into the wood.
+        poseLeftHandIn = Config.Bind("HoldPose", "LeftHandIn", 0.01f, "Metres the left hand is pulled onto the forend from the outside (toward the barrel axis).");
+        poseLeftHandUp = Config.Bind("HoldPose", "LeftHandUp", 0.04f, "Metres the left hand is lifted into the forend underside.");
         // User requirement: fist tips 45° DOWN onto the grip. Do not invert this to tip-up.
         poseRightWristDown = Config.Bind("HoldPose", "RightWristDownDegrees", 45f, "Degrees the right fist tips DOWN about item +X onto the pistol grip. Keep at 45.");
         poseToeIn = Config.Bind("HoldPose", "ToeInDegrees", -6f, "Degrees the barrel turns left toward the crosshair. Negative = barrel turns right. 0 = parallel to the aim.");
