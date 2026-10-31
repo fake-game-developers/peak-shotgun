@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.24
+
+- Picking up or drawing the shotgun no longer sometimes leaves it centred under the camera with the hands crossed; it always settles in the normal right-side hold
+
 ## 1.0.23
 
 - Hit markers: objects (coconuts, dynamite, beehives, spore bombs and clouds) now show the plain hit ticks instead of the red defeat ticks. Only living things can be killed
