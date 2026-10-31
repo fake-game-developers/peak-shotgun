@@ -95,6 +95,11 @@ internal static class GameCompat
             missing.Add($"Mob.{SyncMobStateRpc} (killing beetles and scorpions owned by others)");
         }
 
+        if (AccessTools.Method(typeof(CharacterItems), "GetItemHoldRotation") == null)
+        {
+            missing.Add("CharacterItems.GetItemHoldRotation (shotgun draw can settle centred with crossed arms)");
+        }
+
         if (AccessTools.Field(typeof(ItemCooking), "disableCooking") == null)
         {
             missing.Add("ItemCooking.disableCooking (ammo piles could be cooked)");

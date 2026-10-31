@@ -1,3 +1,4 @@
+using System.Reflection;
 using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
@@ -342,6 +343,10 @@ internal static class ShotgunHoldPosPatch
     // Shoulder → grip. Logs showed ~0.37 m (chest-glued). ~0.82 m leaves room for tip-down without a chicken-wing.
     private const float HoldReach = 0.82f;
 
+    // Equip only (pushOffTerrain is true only in CharacterItems.Equip): where the grip settles in a good hold, so
+    // AttachItem joins the hands in reach. See ShotgunDrawRotationPatch.
+    private const float DrawReach = 0.35f;
+
     private static bool seating;
 
     [HarmonyPostfix]
@@ -366,11 +371,42 @@ internal static class ShotgunHoldPosPatch
                 return;
             }
 
-            __result = shoulder + offset * (HoldReach / dist);
+            __result = shoulder + offset * ((pushOffTerrain ? DrawReach : HoldReach) / dist);
         }
         finally
         {
             seating = false;
         }
+    }
+}
+
+/// <summary>
+/// The arms cannot reach the hold target, so the gun settles where they stop it, and that has two outcomes:
+/// on the right, turned about 28° across the body (the intended hold), or centred under the camera with the
+/// right hand crossed over and the left hand off the forend. Which one depends on the arm pose during the draw.
+/// <c>GetItemHoldRotation</c> is only called by <c>CharacterItems.Equip</c>: start the draw already turned
+/// into the intended hold so the hands attach there. HoldItem still aims the item at the look direction afterwards.
+/// </summary>
+[HarmonyPatch]
+internal static class ShotgunDrawRotationPatch
+{
+    private const string HoldRotationMethod = "GetItemHoldRotation";
+
+    // Item yaw of a good hold in the equip log (anchorR → anchorL ≈ 34° left, 6° of it from the anchors themselves).
+    private const float DrawYawDegrees = 28f;
+
+    private static bool Prepare() => TargetMethod() != null;
+
+    private static MethodBase? TargetMethod() => AccessTools.Method(typeof(CharacterItems), HoldRotationMethod);
+
+    [HarmonyPostfix]
+    private static void TurnAcrossBody(CharacterItems __instance, Item item, ref Quaternion __result)
+    {
+        if (item == null || item.GetComponent<ShotgunInstanceSetup>() == null)
+        {
+            return;
+        }
+
+        __result = Quaternion.AngleAxis(-DrawYawDegrees, __instance.character.data.lookDirection_Up) * __result;
     }
 }
