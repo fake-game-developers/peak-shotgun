@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.23
+
+- Hit markers: objects (coconuts, dynamite, beehives, spore bombs and clouds) now show the plain hit ticks instead of the red defeat ticks. Only living things can be killed
+
 ## 1.0.22
 
 - Hit markers: ticks flash on your crosshair when your shot hits something; bigger red ticks when it downs the target (zombie knocked out, creature killed, Scoutmaster driven off). Only the shooter sees them
