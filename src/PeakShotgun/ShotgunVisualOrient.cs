@@ -30,7 +30,7 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
         }
 
         // Hand anchors were only placed once, when the prefab was built. Re-place them whenever the pose
-        // config changes on disk so Right / Down / Forward / ToeIn apply to the hands live, not just the mesh.
+        // config changes on disk so Side / GunHeight / HoldForward / ToeIn apply to the hands live, not just the mesh.
         if (appliedPoseVersion != Plugin.PoseVersion)
         {
             appliedPoseVersion = Plugin.PoseVersion;
@@ -113,11 +113,14 @@ internal sealed class ShotgunVisualOrient : MonoBehaviour
         Transform c = holder.IsLocal ? cam.transform : holder.refs.animationLookTransform;
         Vector3 Cam(Vector3 world) => c.InverseTransformPoint(world);
         Transform head = holder.GetBodypart(BodypartType.Head).transform;
+        // Item root yaw from the look direction; HoldItem turns it toward 0. Positive = right.
+        Vector3 forward = c.InverseTransformDirection(item.transform.forward);
+        float yaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
         Plugin.Log.LogInfo(
             $"Held shotgun ({(holder.IsLocal ? "camera space" : $"remote {holder.characterName}, look space")}): item={Cam(item.transform.position)}, target={Cam(holder.refs.items.GetItemHoldPos(item))}, "
             + $"anchorR={Cam(item.transform.Find("Hand_R").position)}, anchorL={Cam(item.transform.Find("Hand_L").position)}, "
             + $"handR={Cam(holder.GetBodypart(BodypartType.Hand_R).transform.position)}, handL={Cam(holder.GetBodypart(BodypartType.Hand_L).transform.position)}, "
             + $"shoulderR={Cam(holder.GetBodypart(BodypartType.Arm_R).transform.position)}, headBone={Cam(head.position)}, "
-            + $"itemScale={item.transform.lossyScale}, headScale={head.lossyScale}, defaultPos={item.defaultPos}.");
+            + $"itemYaw={yaw:0}°, itemScale={item.transform.lossyScale}, headScale={head.lossyScale}, defaultPos={item.defaultPos}.");
     }
 }
