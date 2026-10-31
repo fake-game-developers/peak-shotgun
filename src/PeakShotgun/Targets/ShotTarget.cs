@@ -98,6 +98,12 @@ internal abstract class ShotTarget
     internal virtual bool BroadcastsDefeat => false;
 
     /// <summary>
+    /// False for objects (coconuts, dynamite, hives, spores): they can be hit but not killed, so their defeat shows
+    /// the plain hit marker, never the red defeat ticks.
+    /// </summary>
+    internal virtual bool IsLiving => true;
+
+    /// <summary>
     /// Layers outside Character and Default that pellets must also hit to find this target (the bee swarm's body is
     /// on GhostCharacter). Colliders on these layers are only offered to targets that ask for that layer.
     /// </summary>

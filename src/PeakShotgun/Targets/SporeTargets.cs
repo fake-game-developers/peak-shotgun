@@ -13,6 +13,8 @@ internal sealed class SporeBombTarget : ShotTarget<Breakable>
 
     internal override ShootableRule Rule => ShootableRules.Spores;
 
+    internal override bool IsLiving => false;
+
     internal override Component? Classify(Collider collider) =>
         collider.GetComponentInParent<Breakable>() is { } breakable && IsSporeBomb(breakable) ? breakable : null;
 
@@ -52,6 +54,8 @@ internal sealed class SporeCloudTarget : ShotTarget<StatusEmitter>
     internal override ShotTargetKind Kind => ShotTargetKind.SporeCloud;
 
     internal override ShootableRule Rule => ShootableRules.Spores;
+
+    internal override bool IsLiving => false;
 
     internal override Component? Classify(Collider collider) =>
         collider.GetComponentInParent<StatusEmitter>() is { } emitter && IsSporeCloud(emitter) ? emitter : null;

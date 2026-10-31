@@ -14,6 +14,8 @@ internal sealed class CoconutTarget : ShotTarget<Item>
 
     internal override ShootableRule Rule => ShootableRules.Coconuts;
 
+    internal override bool IsLiving => false;
+
     internal override Component? Classify(Collider collider) =>
         collider.GetComponentInParent<Item>() is { } item && IsTreeCoconut(item) ? item : null;
 

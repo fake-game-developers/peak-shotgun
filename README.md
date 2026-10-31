@@ -80,7 +80,7 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 | `[HitsToDefeat]` | `Jellyfish` | `1` | Shots to smash a jellyfish |
 | `[HitsToDefeat]` | `Coconuts` | `1` | Shots to knock a coconut off a tree |
 | `[HitsToDefeat]` | `BeeSwarms` | `1` | Shots to scatter a bee swarm |
-| `[Feedback]` | `HitMarkers` | `true` | Flash ticks on the crosshair when your shot hits something; larger red ticks when it downs it |
+| `[Feedback]` | `HitMarkers` | `true` | Flash ticks on the crosshair when your shot hits something; larger red ticks when it downs a living target (not coconuts, dynamite, beehives or spores) |
 | `[Feedback]` | `Tracers` | `true` | Short streaks along each pellet's path |
 | `[Feedback]` | `ImpactEffects` | `true` | Sparks and dust where pellets land |
 | `[Debug]` | `EnableDebugMode` | `false` | Host spawns test zombies, a shotgun, and luggage at the Airport / Shore |

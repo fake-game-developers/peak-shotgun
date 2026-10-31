@@ -194,7 +194,8 @@ internal static class ShotgunCombat
             ReplicateWorldDefeat(target, gun, view, extra);
 
             // Targets without a hit count (a tumbleweed push, a balloon pop) react to every hit; not a defeat.
-            if (target.Rule.HasHitCount)
+            // Objects (a falling coconut, exploding dynamite) are only hit, never killed.
+            if (target.Rule.HasHitCount && target.IsLiving)
             {
                 ShotgunHitMarker.ConfirmDefeat(gun, shooter, view != null ? view.ViewID : 0);
             }

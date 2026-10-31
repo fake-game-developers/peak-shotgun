@@ -13,6 +13,8 @@ internal sealed class DynamiteTarget : ShotTarget<Dynamite>
 
     internal override ShootableRule Rule => ShootableRules.Dynamite;
 
+    internal override bool IsLiving => false;
+
     protected override void Defeat(Dynamite dynamite, ShotHit hit)
     {
         if (dynamite == null)

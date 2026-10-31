@@ -10,6 +10,8 @@ internal sealed class BeehiveTarget : ShotTarget<Beehive>
 
     internal override ShootableRule Rule => ShootableRules.Beehives;
 
+    internal override bool IsLiving => false;
+
     protected override PhotonView? ViewOf(Beehive hive)
     {
         Item? hiveItem = hive.item != null ? hive.item : hive.GetComponent<Item>();
