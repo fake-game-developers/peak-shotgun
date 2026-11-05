@@ -24,7 +24,7 @@ PEAK does not include a shotgun model. The mod builds the gun from the blowgun a
 
 - **On spawn (optional):** set `GiveShotgunOnSpawn = true` and the **host** puts one shotgun in each scout's hand when they enter the climb or join mid-run (Shore and later — not at the Airport; once per player per run).
 - **Roots:** every run, **at least two random luggage** anywhere on the Roots map are forced to contain a shotgun. No mod config turns it off, but a custom run that disables the shotgun in its item settings gets none.
-- **Other biomes:** by default every `[Shootables]` target is on, so luggage outside Roots can roll a shotgun (**RidiculouslyRare**). Luggage stays Roots-only only when **Zombies is the sole enabled** shootable, not counting Scoutmaster, tumbleweeds, bee swarms, Bing Bong and balloons (or set `CanSpawnOnAnyBiome = true` to force every biome). Roots still forces two suitcases either way.
+- **Other biomes:** by default `CanSpawnOnAnyBiome` is on, so luggage outside Roots can roll a shotgun (**RidiculouslyRare**). Luggage stays Roots-only only when `CanSpawnOnAnyBiome = false` and **Zombies is the sole enabled** shootable, not counting Scoutmaster, tumbleweeds, bee swarms, Bing Bong and balloons. Roots still forces two suitcases either way.
 - **Cap:** at most **4** luggage per biome can contain a shotgun in a single run (including Roots).
 - **Campfire ammo:** by default the **host** places ammo piles at each segment campfire (`[AmmoPile] SpawnAtCampfire`). Hold a shotgun with fewer than `Shots` left, interact (**REFILL**), and the magazine fills up to `Shots` (never above). The pile stays. Ammo piles never appear in luggage. Set `SpawnAtCampfire = false` to disable.
 
@@ -36,9 +36,9 @@ After one launch, edit `BepInEx/config/PeakShotgun.cfg`:
 
 | Section | Key | Default | Meaning |
 |---|---|---|---|
-| `[Shotgun]` | `CanSpawnOnAnyBiome` | `false` | Force rare rolls in every biome. When `false`, Roots-only only if Zombies is the sole `[Shootables]` target |
+| `[Shotgun]` | `CanSpawnOnAnyBiome` | `true` | Force rare rolls in every biome. When `false`, Roots-only only if Zombies is the sole `[Shootables]` target |
 | `[Shotgun]` | `GiveShotgunOnSpawn` | `false` | Host only: one shotgun in hand per scout when they spawn into the climb / join mid-run (not Airport) |
-| `[Shotgun]` | `Shots` | `5` | Shots per shotgun (host's value in multiplayer) |
+| `[Shotgun]` | `Shots` | `6` | Shots per shotgun (host's value in multiplayer) |
 | `[Shotgun]` | `EnableRecoil` | `true` | Push the shooter back on each shot |
 | `[Shotgun]` | `Recoil` | `5` | Recoil strength in m/s (0–10) |
 | `[Shotgun]` | `CarryWeight` | `4` | Stamina-bar weight (1 = 2.5). Default 4 = 10. 0 matches an empty backpack |
@@ -111,7 +111,7 @@ Keys are `NAME_SHOTGUN`, `NAME_AMMO PILE` and `PEAKSHOTGUN_REFILL`. Language col
 ## How to test
 
 1. Set `EnableDebugMode = true` under `[Debug]` in the PeakShotgun config file (it appears after one launch). Host a run. On the Shore, three zombies appear near you, and a Shotgun is on the ground in front of you. With debug mode off (the default) nothing is force-spawned there; open Roots luggage to find the two guaranteed shotguns.
-2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds, plays the shotgun fire sound, draws pellet tracers with sparks where they land and pushes you back a little. A hit flashes ticks on the crosshair. Each shotgun has 5 shots. Tune `Shots`, `EnableRecoil`, and `Recoil` under `[Shotgun]` as needed.
+2. Press primary fire. It shoots a spread of pellets about every 0.85 seconds, plays the shotgun fire sound, draws pellet tracers with sparks where they land and pushes you back a little. A hit flashes ticks on the crosshair. Each shotgun has 6 shots. Tune `Shots`, `EnableRecoil`, and `Recoil` under `[Shotgun]` as needed.
 3. Shoot another scout. They take a heavy Injury and get flipped. You cannot hit yourself.
 4. Reach the Roots (Peak ascent or higher for natural zombies). Open luggage until you find a shotgun, then shoot a zombie. The first blast flips it, and it can get back up. The second blast knocks it out, and it stays down. Or use debug Shore zombies from step 1.
 

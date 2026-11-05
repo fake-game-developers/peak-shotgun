@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.25
+
+- Each shotgun now holds 6 shots by default instead of 5 (`[Shotgun] Shots`)
+- `[Shotgun] CanSpawnOnAnyBiome` is now on by default. To keep luggage shotguns in Roots with only Zombies enabled, also set `CanSpawnOnAnyBiome = false`
+- These defaults only apply to new configs: an existing `PeakShotgun.cfg` keeps its saved values
+
 ## 1.0.24
 
 - Picking up or drawing the shotgun no longer sometimes leaves it centred under the camera with the hands crossed; it always settles in the normal right-side hold
