@@ -31,7 +31,7 @@ public partial class Plugin : BaseUnityPlugin
     private static ConfigEntry<int>? shots;
 
     /// <summary>Local <c>Shots</c> config (host publishes this; clients ignore it for ammo).</summary>
-    internal static int LocalConfiguredShots => Mathf.Max(1, shots?.Value ?? 5);
+    internal static int LocalConfiguredShots => Mathf.Max(1, shots?.Value ?? 10);
 
     /// <summary>Magazine size in use: host-synced in multiplayer, otherwise local config.</summary>
     internal static int ShotCount => HostConfigSync.ShotCount;
@@ -73,7 +73,7 @@ public partial class Plugin : BaseUnityPlugin
     /// rolls in every biome. Roots always gets <see cref="GuaranteedLuggageShotguns"/> forced suitcases.
     /// </summary>
     internal static bool CanSpawnOnAnyBiome =>
-        (canSpawnOnAnyBiome?.Value ?? false) || !ShootableRules.IsZombiesOnly;
+        (canSpawnOnAnyBiome?.Value ?? true) || !ShootableRules.IsZombiesOnly;
 
     /// <summary>Host gives each scout one shotgun in hand once per run (late joiners included).</summary>
     internal static bool GiveShotgunOnSpawn => giveShotgunOnSpawn?.Value ?? false;
@@ -357,7 +357,7 @@ public partial class Plugin : BaseUnityPlugin
     {
         Instance = this;
         Log = Logger;
-        shots = Config.Bind("Shotgun", "Shots", 5, new ConfigDescription(
+        shots = Config.Bind("Shotgun", "Shots", 10, new ConfigDescription(
             "Shots in each shotgun. Host's value is used in multiplayer. Save the .cfg and start a new map (no need to quit PEAK).",
             new AcceptableValueRange<int>(1, 999)));
         recoilEnabled = Config.Bind("Shotgun", "EnableRecoil", true, "Push the shooter back on each shot. Strength is Recoil.");
@@ -370,7 +370,7 @@ public partial class Plugin : BaseUnityPlugin
         canSpawnOnAnyBiome = Config.Bind(
             "Shotgun",
             "CanSpawnOnAnyBiome",
-            false,
+            true,
             "Force rare shotgun rolls in every biome. When false, luggage is Roots-only only if Zombies is the sole enabled [Shootables] target; any other shootables mix also unlocks all-biome rolls. Roots always forces two random suitcases either way.");
         giveShotgunOnSpawn = Config.Bind(
             "Shotgun",
