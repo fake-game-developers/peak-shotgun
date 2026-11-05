@@ -76,7 +76,7 @@ Every hit RPC carries the shot id, and the receiver checks it with `Action_Gun.T
 
 The shot sound is a runtime `SFX_Instance` built from `sounds/shotgun_fire_01.wav`. If that wav fails to load, the gun falls back to the blowgun's `shotSFX`. An empty magazine plays `emptyClickSFX` from `sounds/shotgun_empty_01.wav` at the muzzle on the fire-rate cooldown, with no blast FX. The click is sent to everyone (`RPC_EmptyClick`), same as the shot sound. Vanilla `Item.CanUsePrimary` is false at 0 uses, so `ShotgunEmptyUsePatch` keeps the shotgun usable when empty. `ItemUseFeedback.sfxUsed` on the clone is cleared so the blowgun's use sound does not also play.
 
-Ammo count is the BepInEx key `Shots` in section `Shotgun` (`BepInEx/config/PeakShotgun.cfg`). Default 10. Values below 1 become 1. `item.totalUses` is that number, not `-1`.
+Ammo count is the BepInEx key `Shots` in section `Shotgun` (`BepInEx/config/PeakShotgun.cfg`). Default 6. Values below 1 become 1. `item.totalUses` is that number, not `-1`.
 
 Recoil is `[Shotgun] EnableRecoil` (default true) and `[Shotgun] Recoil` (strength, default 5 m/s, `AcceptableValueRange` 0-10 so BepInEx clamps larger values to 10), both read live. `Fire` calls `Character.AddForce` on the shooter opposite the camera forward with `Recoil / fixedDeltaTime`: bodypart forces are applied once per physics step, so every bone gains exactly `Recoil` m/s. The shooter owns their character, so the push reaches other clients through normal character sync.
 

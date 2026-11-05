@@ -31,7 +31,7 @@ public partial class Plugin : BaseUnityPlugin
     private static ConfigEntry<int>? shots;
 
     /// <summary>Local <c>Shots</c> config (host publishes this; clients ignore it for ammo).</summary>
-    internal static int LocalConfiguredShots => Mathf.Max(1, shots?.Value ?? 10);
+    internal static int LocalConfiguredShots => Mathf.Max(1, shots?.Value ?? 6);
 
     /// <summary>Magazine size in use: host-synced in multiplayer, otherwise local config.</summary>
     internal static int ShotCount => HostConfigSync.ShotCount;
@@ -357,7 +357,7 @@ public partial class Plugin : BaseUnityPlugin
     {
         Instance = this;
         Log = Logger;
-        shots = Config.Bind("Shotgun", "Shots", 10, new ConfigDescription(
+        shots = Config.Bind("Shotgun", "Shots", 6, new ConfigDescription(
             "Shots in each shotgun. Host's value is used in multiplayer. Save the .cfg and start a new map (no need to quit PEAK).",
             new AcceptableValueRange<int>(1, 999)));
         recoilEnabled = Config.Bind("Shotgun", "EnableRecoil", true, "Push the shooter back on each shot. Strength is Recoil.");
